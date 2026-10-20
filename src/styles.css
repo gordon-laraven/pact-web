@@ -1,0 +1,518 @@
+/* PACT. Flat, dark, one accent. Change --accent and everything follows. */
+
+:root {
+  --accent: #2e7d5b;
+  /* lighter tint of the accent for text and marks on dark backgrounds */
+  --accent-tint: color-mix(in oklab, var(--accent), white 58%);
+
+  --bg: #0b0f0d;
+  --stage: #101613;
+  --surface: #161e1a;
+  --line: rgba(236, 243, 239, 0.1);
+  --text: #eef3f0;
+  --text-muted: rgba(238, 243, 240, 0.64);
+  --text-faint: rgba(238, 243, 240, 0.4);
+  --figure: #eef3f0;
+
+  color-scheme: dark;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent-tint);
+  outline-offset: 3px;
+}
+
+/* ---------- Overview ---------- */
+
+.overview {
+  min-height: 100dvh;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: max(40px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.overview-brand {
+  text-align: center;
+  padding-top: 12px;
+}
+
+.wordmark {
+  margin: 0;
+  font-size: clamp(56px, 16vw, 84px);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  /* letter-spacing adds trailing space; balance it so the word is centred */
+  margin-right: -0.14em;
+  line-height: 1;
+}
+
+.tagline {
+  margin: 10px 0 0;
+  font-size: 18px;
+  color: var(--accent-tint);
+  letter-spacing: 0.02em;
+}
+
+.overview-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 22px 20px 8px;
+}
+
+.overview-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.overview-meta {
+  margin: 6px 0 14px;
+  display: flex;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.exercise-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.exercise-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  font-size: 18px;
+}
+
+.exercise-name {
+  font-weight: 600;
+}
+
+.exercise-rx {
+  color: var(--accent-tint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.overview-actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.start-button {
+  width: 100%;
+  min-height: 68px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.start-button:hover {
+  background: color-mix(in oklab, var(--accent), white 8%);
+}
+
+.start-button:active {
+  transform: translateY(1px);
+}
+
+.overview-hint {
+  margin: 0;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 15px;
+}
+
+/* ---------- Player ---------- */
+
+.player {
+  position: fixed;
+  inset: 0;
+  background: #000; /* the margins around the 9:16 stage on wide screens */
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.stage {
+  /* Full screen on phones; a centred 9:16 column on anything wider. */
+  width: min(100vw, calc(100dvh * 9 / 16));
+  height: 100dvh;
+  background: var(--stage);
+  container-type: size;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+  position: relative;
+}
+
+.stage-done {
+  cursor: default;
+}
+
+.topbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: max(10px, env(safe-area-inset-top)) 10px 8px;
+}
+
+.topbar-right {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.icon-btn {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.badge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 46cqw;
+}
+
+a.badge:hover {
+  color: var(--text);
+}
+
+.progress {
+  display: flex;
+  gap: 4px;
+  padding: 0 16px;
+}
+
+.progress-seg {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent-tint);
+  transform: scaleX(0);
+  transform-origin: left center;
+  will-change: transform;
+}
+
+.figure-area {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 2cqh 4cqw 0;
+}
+
+.figure {
+  width: 100%;
+  height: 100%;
+  display: block;
+  transition: opacity 0.35s ease;
+}
+
+.figure-bone {
+  stroke: var(--figure);
+  stroke-linecap: round;
+}
+
+.figure-dot {
+  fill: var(--accent-tint);
+}
+
+.figure-head {
+  fill: var(--figure);
+}
+
+.figure-floor {
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-linecap: round;
+}
+
+/* Side view: the far-side limbs sit behind and read as depth. */
+.figure[data-view='side'] .figure-far {
+  opacity: 0.38;
+}
+
+/* Prep / rest: a dimmed, slowed preview of the next move. */
+.figure[data-mode='preview'] {
+  opacity: 0.42;
+}
+
+.is-paused .figure {
+  opacity: 0.3;
+}
+
+.paused-chip {
+  position: absolute;
+  left: 50%;
+  top: 2cqh;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: var(--text);
+  font-size: max(16px, 2.3cqh);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.panel {
+  padding: 0 20px max(18px, env(safe-area-inset-bottom));
+  /* a subtle scrim so text stays legible where the figure runs close */
+  background: linear-gradient(to bottom, rgba(16, 22, 19, 0), var(--stage) 3cqh);
+  margin-top: -3cqh;
+  position: relative;
+  text-align: center;
+}
+
+.panel-text {
+  padding-top: 3cqh;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: max(24px, 3.9cqh);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.panel-set,
+.panel-sub {
+  margin: 0.4cqh 0 0;
+  font-size: max(16px, 2.4cqh);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-kicker {
+  margin: 0;
+  font-size: max(22px, 3.4cqh);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-tint);
+  line-height: 1.15;
+}
+
+/* Second line under the kicker keeps the layout the same height as work. */
+.stage-prep .panel-kicker::after,
+.stage-rest .panel-kicker::after {
+  content: '\a0';
+  display: block;
+  font-size: max(16px, 2.4cqh);
+  margin-top: 0.4cqh;
+}
+
+.panel-sub {
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.panel-big {
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.25em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  padding: 0.6cqh 0 0.8cqh;
+}
+
+.panel-big-value {
+  font-size: max(84px, 15cqh);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.panel-big-suffix {
+  font-size: max(30px, 5.2cqh);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.stage-rest .panel-big-value,
+.stage-prep .panel-big-value {
+  color: var(--accent-tint);
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: max(24px, 7cqw);
+  padding-top: 2.2cqh;
+}
+
+.ctrl {
+  width: max(56px, 7cqh);
+  height: max(56px, 7cqh);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.ctrl:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.ctrl-main {
+  width: max(72px, 9cqh);
+  height: max(72px, 9cqh);
+  background: var(--accent);
+  color: #fff;
+}
+
+.ctrl-main:hover {
+  background: color-mix(in oklab, var(--accent), white 8%);
+}
+
+/* ---------- Finish ---------- */
+
+.finish {
+  grid-row: 3 / 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3cqh;
+  padding: 0 24px 8cqh;
+  text-align: center;
+}
+
+.finish-title {
+  margin: 0;
+  font-size: max(34px, 5.4cqh);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.finish-time {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6cqh;
+}
+
+.finish-time-value {
+  font-size: max(72px, 12cqh);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent-tint);
+  font-variant-numeric: tabular-nums;
+}
+
+.finish-time-label {
+  font-size: max(16px, 2.4cqh);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.restart-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 0 34px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.restart-button:hover {
+  background: color-mix(in oklab, var(--accent), white 8%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .figure {
+    transition: none;
+  }
+}

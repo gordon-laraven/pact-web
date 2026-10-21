@@ -14,6 +14,11 @@ export const animations: Record<string, Animation> = Object.fromEntries(
   [jumpingJacks, squat, pushUp, plank, gluteBridge, mountainClimbers].map((a) => [a.id, a]),
 )
 
+/** Adds an animation made at runtime (e.g. extracted from a video). */
+export function registerAnimation(anim: Animation): void {
+  animations[anim.id] = anim
+}
+
 export function getAnimation(id: string): Animation {
   const anim = animations[id]
   if (!anim) throw new Error(`Unknown animationId "${id}"`)

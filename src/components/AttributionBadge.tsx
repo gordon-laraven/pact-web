@@ -1,11 +1,13 @@
 import type { Workout } from '../types'
 
-// Centre of the player's top bar. Today every workout is hand-written, so it
-// reads "Sample workout". When a workout carries a creator, this shows their
-// name, linked to attributionUrl when there is one.
+// Centre of the player's top bar. Without a creator it shows a fallback label
+// ("Sample workout", or "From your videos"). When a workout carries a creator,
+// this shows their name, linked to attributionUrl when there is one.
 
-export function AttributionBadge({ creator }: { creator?: Workout['creator'] }) {
-  if (!creator) return <span className="badge">Sample workout</span>
+type Props = { creator?: Workout['creator']; /** shown when there's no creator */ fallback?: string }
+
+export function AttributionBadge({ creator, fallback = 'Sample workout' }: Props) {
+  if (!creator) return <span className="badge">{fallback}</span>
   if (!creator.attributionUrl) return <span className="badge">{creator.name}</span>
   return (
     <a

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
-import { animations, getAnimation, sharedFrame } from '../animation/library'
+import { getAnimation, sharedFrame } from '../animation/library'
 import { PlayerClock } from '../engine/clock'
 import { buildCues, cuesBetween } from '../engine/cues'
 import {
@@ -29,8 +29,6 @@ import {
 } from './icons'
 import { ProgressBar, type ProgressBarHandle } from './ProgressBar'
 import { StickFigure, type StickFigureHandle } from './StickFigure'
-
-const FRAME = sharedFrame(Object.values(animations))
 
 /** Everything the HUD shows. Only re-rendered when one of these changes. */
 type View = {
@@ -87,15 +85,22 @@ type Props = {
   audio: CuePlayer
   /** Clock multiplier (dev-only ?speed=). */
   speed: number
+  /** Top-bar label when the workout has no creator. */
+  badge?: string
   onExit: () => void
 }
 
-export function Player({ timeline, audio, speed, onExit }: Props) {
+export function Player({ timeline, audio, speed, badge, onExit }: Props) {
   const root = useRef<HTMLDivElement>(null)
   const figure = useRef<StickFigureHandle>(null)
   const progress = useRef<ProgressBarHandle>(null)
   const clock = useMemo(() => new PlayerClock(timeline.duration, speed), [timeline, speed])
   const cues = useMemo(() => buildCues(timeline), [timeline])
+  // One scale for every move in this workout, so the figure never changes size.
+  const frame = useMemo(
+    () => sharedFrame(timeline.workout.exercises.map((e) => getAnimation(e.animationId))),
+    [timeline],
+  )
   const cueCursor = useRef(-1e-6) // cues at or before this time have fired
   const lastElapsed = useRef(0)
   const activeSec = useRef(0) // time actually worked through (excludes skips)
@@ -223,7 +228,7 @@ export function Player({ timeline, audio, speed, onExit }: Props) {
           <button type="button" className="icon-btn" aria-label="Close workout" onClick={button(onExit)}>
             <CloseIcon />
           </button>
-          <AttributionBadge creator={timeline.workout.creator} />
+          <AttributionBadge creator={timeline.workout.creator} fallback={badge} />
           <div className="topbar-right">
             {canFullscreen && (
               <button
@@ -267,7 +272,7 @@ export function Player({ timeline, audio, speed, onExit }: Props) {
         ) : (
           <>
             <div className="figure-area">
-              <StickFigure ref={figure} frame={FRAME} />
+              <StickFigure ref={figure} frame={frame} />
               {!view.playing && <div className="paused-chip">Paused · tap to resume</div>}
             </div>
 

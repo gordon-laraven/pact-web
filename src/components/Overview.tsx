@@ -1,7 +1,9 @@
 import type { Timeline } from '../engine/timeline'
 import { formatClock, prescription } from '../player/format'
 
-export function Overview({ timeline, onStart }: { timeline: Timeline; onStart: () => void }) {
+type Props = { timeline: Timeline; onStart: () => void; onMakeFromVideo: () => void }
+
+export function Overview({ timeline, onStart, onMakeFromVideo }: Props) {
   const { workout } = timeline
   return (
     <main className="overview">
@@ -35,6 +37,9 @@ export function Overview({ timeline, onStart }: { timeline: Timeline; onStart: (
           Start
         </button>
         <p className="overview-hint">Hands-free. Press play once and follow along.</p>
+        <button type="button" className="secondary-button" onClick={onMakeFromVideo}>
+          Make a workout from video
+        </button>
       </div>
     </main>
   )

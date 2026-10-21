@@ -4,11 +4,14 @@
 
 This repo is a **frontend-only prototype** that tests one thing: **the hands-free feel**. You press Start once and follow a full workout, like putting in a P90X tape. A stick figure demonstrates each move. Reps, sets, rest timers and spoken cues advance on their own. You never touch the screen mid-workout.
 
+It also has a first version of the core idea: **Make a workout from video.** Pick a clip on your device, PACT tracks the body, finds the repeating movement, cuts one clean rep, and turns it into a stick-figure move you can put in a hands-free workout. See [Make a workout from video](#make-a-workout-from-video).
+
 ### What it is not (yet)
 
-- No backend, accounts, database or AI.
-- No video import, pose extraction or stock footage.
-- The workout is hand-written (`src/data/sampleWorkout.ts`), and so are the animations (`src/animation/library/`).
+- No backend, accounts, database or AI. Workouts you build from videos live in memory and are gone when you refresh.
+- No downloading from Facebook, Instagram or YouTube: you pick a video file you have the rights to. It never leaves your device.
+- The exercise name, sets and reps for a video clip are typed in by you; AI will do that later.
+- The sample workout is hand-written (`src/data/sampleWorkout.ts`), and so are its animations (`src/animation/library/`).
 
 ## Run it
 
@@ -54,6 +57,39 @@ In **dev builds only** (`pnpm dev`), append `?speed=N` to multiply the player cl
 
 If the speech API is missing or fails, the workout runs silently, with no errors.
 
+## Make a workout from video
+
+On the overview, press **Make a workout from video**.
+
+1. **Choose a clip.** Best results come from one person, whole body in frame, filmed side-on or facing the camera, with one exercise per clip. Use **Start / End** to trim to the part with the exercise.
+2. **Analyze movement.** PACT steps through the clip at 15 frames per second with [MediaPipe Pose](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker) and draws the tracked skeleton over the video.
+   - It runs on your computer's graphics card, falling back to the processor.
+   - The first run downloads the ~9 MB pose model from Google; after that it's cached.
+3. **Check the move.** The preview loops the extracted rep and shows how many reps were found, the seconds per rep, and the view. Name it, choose Reps or Timed, set sets, reps and rest, and **Add to workout**.
+4. Add more clips, then **Start workout**. It plays in the same hands-free player, with the badge reading "From your videos".
+
+**How extraction works** (`src/extract/extract.ts`, pure and unit-tested):
+- **Map:** MediaPipe's 33 landmarks become our 14 joints. The head is the midpoint of the ears; the neck is the midpoint of the shoulders.
+- **Clean up:** frames without a person are filled in from their neighbours, everything is resampled to 30 fps, single-frame spikes are removed and the jitter is smoothed.
+- **View and facing:** if the shoulders overlap it's a side view, otherwise front. Side views are mirrored to face right, like the library.
+- **Near and far limbs (side view):**
+  - The more visible arm and leg become the near (bright) side, re-chosen every frame because trackers swap left and right mid-clip.
+  - A mostly hidden far limb is drawn right behind the near one instead of where the tracker guessed it.
+- **Find the reps:** the main direction of motion (PCA) gives one signal, and its autocorrelation gives the rep length. The clip is cut into reps that start where the clip starts (usually the start position).
+- **Make one loop:** the consistent reps are combined (the median at each moment of the rep) into one rep, and the loop is closed.
+- **Holds:** a clip with no real repetition (plank, wall sit) becomes a hold, with a subtle breathing loop.
+- **Fit:** the result is scaled to the library's body proportions and placed in the 0..1 frame, feet on the floor line. The output is a plain `Animation`, registered at runtime.
+
+**Known limits:**
+- Side views of arms are the weak spot. The tracker has to guess the hidden arm and can mislocate the visible one when it crosses the face or body. Check the preview, and if an arm looks wrong, try trimming to a cleaner section or a clip with better lighting.
+- Analysis speed depends on the device: a few seconds per 10 s of video with a decent graphics card, much slower without one.
+- One exercise per clip. Splitting a multi-exercise reel automatically is a later (AI) step.
+- In dev builds, the raw tracking of the last analysed clip is available in the browser console as `window.__pactClip`, for debugging.
+
+`src/extract/mediapipe.ts` is the only browser-specific part.
+- **The WebAssembly runtime** is copied from `node_modules` into `public/mediapipe/` by `scripts/copy-mediapipe-wasm.mjs`. This runs automatically on install, dev and build, and the copy is git-ignored.
+- **The tracking library** only loads when you open the video screen.
+
 ## Architecture
 
 The separations below are deliberate: later steps (automatic workout extraction, MediaPipe pose tracking) plug into them.
@@ -76,6 +112,10 @@ src/
     StickFigure.tsx           SVG renderer, updated imperatively each frame
     Overview.tsx, ProgressBar.tsx, AttributionBadge.tsx, icons.tsx
   player/                     browser wrappers: audio.ts, wakeLock.ts, fullscreen.ts, format.ts
+  extract/
+    extract.ts                pose landmarks -> one looping Animation (pure, unit-tested)
+    mediapipe.ts              runs MediaPipe Pose over a <video>, frame by frame
+  components/VideoBuilder.tsx "Make a workout from video" screen
 ```
 
 **One clock drives everything.** Each frame, `Player` does:

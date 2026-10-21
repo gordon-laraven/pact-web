@@ -217,7 +217,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
       console.warn('[pact] pose tracking failed:', err)
       setStatus({
         kind: 'error',
-        message: "Couldn't run body tracking. Check your internet connection (the tracking model downloads on first use) and try again.",
+        message: "Body tracking didn't start. It downloads once, on first use, so check your connection and try again.",
       })
     }
   }
@@ -415,8 +415,8 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
         <button type="button" className="text-btn" onClick={onBack}>
           ← Back
         </button>
-        <h1 className="builder-title">Make from video</h1>
-        <p className="builder-note">Your video stays on this device. Nothing is uploaded.</p>
+        <h1 className="builder-title">Make it from a video</h1>
+        <p className="builder-note">Your video stays on this device. Nothing leaves it.</p>
       </header>
 
       <section className="overview-card builder-step">
@@ -490,14 +490,14 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
                 <div className="progress-seg">
                   <div className="progress-fill" style={{ transform: `scaleX(${status.progress})` }} />
                 </div>
-                <span>{status.progress === 0 ? 'Loading body tracking…' : `Tracking body… ${Math.round(status.progress * 100)}%`}</span>
+                <span>{status.progress === 0 ? 'Getting body tracking ready…' : `Following the movement… ${Math.round(status.progress * 100)}%`}</span>
                 <button type="button" className="text-btn" onClick={cancel}>
                   Cancel
                 </button>
               </div>
             ) : (
               <button type="button" className="secondary-button" onClick={analyze} disabled={!duration}>
-                {analysis ? 'Analyze again' : 'Analyze movement'}
+                {analysis ? 'Look again' : 'Find the moves'}
               </button>
             )}
           </>
@@ -567,7 +567,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
       <section className="overview-card builder-step">
         <h2 className="step-title">Your workout</h2>
         {draft.exercises.length === 0 ? (
-          <p className="step-hint">Movements you add appear here, in order. Add as many clips as you like, then press Start.</p>
+          <p className="step-hint">Nothing here yet. Add a clip or two, then press start. Small is fine.</p>
         ) : (
           <>
             <label className="workout-name">

@@ -41,7 +41,7 @@ export function buildCues(tl: Timeline): Cue[] {
     }
   })
 
-  if (phases.length > 0) cues.push({ at: tl.duration, say: 'Done. Workout complete.' })
+  if (phases.length > 0) cues.push({ at: tl.duration, say: 'Done. Pact kept.' })
   return cues.sort((a, b) => a.at - b.at)
 }
 

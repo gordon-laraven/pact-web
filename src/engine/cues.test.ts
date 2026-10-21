@@ -46,7 +46,7 @@ describe('buildCues', () => {
   })
 
   it('ends with Done at the very end', () => {
-    expect(cues.at(-1)).toEqual({ at: 115, say: 'Done. Workout complete.' })
+    expect(cues.at(-1)).toEqual({ at: 115, say: 'Done. Pact kept.' })
   })
 
   it('is sorted by time', () => {

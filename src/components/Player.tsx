@@ -44,7 +44,7 @@ type View = {
 function toView(st: PlayerState, playing: boolean, activeSec: number): View {
   const base = { playing, setLabel: null, bigSuffix: null, sub: null }
   if (st.finished || !st.phase) {
-    return { ...base, kind: 'done', playing: false, title: 'Workout complete', big: formatClock(activeSec) }
+    return { ...base, kind: 'done', playing: false, title: 'Pact kept.', big: formatClock(activeSec) }
   }
   const countdown = String(Math.max(1, Math.ceil(st.phaseRemaining - 1e-6)))
   const setLabel = st.totalSets > 1 ? `Set ${st.setNumber} / ${st.totalSets}` : null
@@ -260,21 +260,22 @@ export function Player({ timeline, audio, speed, badge, onExit }: Props) {
 
         {done ? (
           <section className="finish">
-            <h2 className="finish-title">Workout complete</h2>
+            <h2 className="finish-title">Pact kept.</h2>
+            <p className="finish-note">You showed up. That's the whole point.</p>
             <p className="finish-time">
               <span className="finish-time-value">{view.big}</span>
-              <span className="finish-time-label">total time</span>
+              <span className="finish-time-label">moved today</span>
             </p>
             <button type="button" className="restart-button" onClick={button(restart)}>
               <RestartIcon size={22} />
-              Restart
+              Go again
             </button>
           </section>
         ) : (
           <>
             <div className="figure-area">
               <StickFigure ref={figure} frame={frame} />
-              {!view.playing && <div className="paused-chip">Paused · tap to resume</div>}
+              {!view.playing && <div className="paused-chip">Paused · tap to keep going</div>}
             </div>
 
             <section className="panel">

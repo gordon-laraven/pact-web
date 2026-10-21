@@ -5,7 +5,7 @@ import type { Workout } from '../types'
 
 export const sampleWorkout: Workout = {
   id: 'sample-full-body-starter',
-  title: 'Full-Body Starter',
+  title: 'Full-body starter',
   source: { platform: 'manual' },
   exercises: [
     {

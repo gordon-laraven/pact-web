@@ -4,8 +4,21 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0d1210" />
-    <title>PACT</title>
+    <meta name="theme-color" content="#f4efe6" />
+    <meta name="description" content="pact: workouts that fit your space, your time and whatever's around. Keep the pact." />
+    <title>pact · Keep the pact.</title>
+    <script>
+      // Theme before first paint (see src/theme/theme.ts).
+      ;(function () {
+        var t = null
+        try {
+          t = localStorage.getItem('pact-theme')
+        } catch (e) {}
+        if (t !== 'light' && t !== 'dark') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        document.documentElement.dataset.theme = t
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#3a3532' : '#f4efe6')
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

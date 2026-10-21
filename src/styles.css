@@ -1,28 +1,7 @@
-/* PACT. Flat, dark, one accent. Change --accent and everything follows. */
+/* pact. Colors, fonts and radii come from theme/tokens.css (the one place to edit them). */
 
 :root {
-  --accent: #2e7d5b;
-  /* lighter tint of the accent for text and marks on dark backgrounds */
-  --accent-tint: color-mix(in oklab, var(--accent), white 58%);
-
-  --bg: #0b0f0d;
-  --stage: #101613;
-  --surface: #161e1a;
-  --line: rgba(236, 243, 239, 0.1);
-  --text: #eef3f0;
-  --text-muted: rgba(238, 243, 240, 0.64);
-  --text-faint: rgba(238, 243, 240, 0.4);
-  --figure: #eef3f0;
-
-  color-scheme: dark;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    'Helvetica Neue',
-    Arial,
-    sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
@@ -41,13 +20,24 @@ body {
   color: var(--text);
 }
 
-button {
+button,
+input,
+select,
+textarea {
   font: inherit;
   color: inherit;
 }
 
+h1,
+h2,
+h3 {
+  font-family: var(--font-head);
+  font-weight: var(--weight-head);
+  letter-spacing: -0.01em;
+}
+
 :focus-visible {
-  outline: 3px solid var(--accent-tint);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
@@ -63,40 +53,59 @@ button {
   gap: 28px;
 }
 
-.overview-brand {
-  text-align: center;
-  padding-top: 12px;
+.overview-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .wordmark {
+  display: block;
+  color: var(--text);
+  flex: none;
+}
+
+.overview-hero {
+  padding: 8px 0 0;
+}
+
+.overview-hero h1 {
   margin: 0;
-  font-size: clamp(56px, 16vw, 84px);
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  /* letter-spacing adds trailing space; balance it so the word is centred */
-  margin-right: -0.14em;
-  line-height: 1;
+  font-size: clamp(34px, 9vw, 46px);
+  line-height: 1.1;
 }
 
 .tagline {
-  margin: 10px 0 0;
-  font-size: 18px;
-  color: var(--accent-tint);
-  letter-spacing: 0.02em;
+  margin: 12px 0 0;
+  max-width: 34ch;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--text-muted);
 }
 
-.overview-card {
+/* the glow: one thin line, never a wash */
+.glow-line {
+  width: 56px;
+  height: 2px;
+  border: 0;
+  margin: 20px 0 0;
+  border-radius: 2px;
+  background: var(--glow);
+}
+
+.overview-card,
+.card {
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 16px;
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-l);
   padding: 22px 20px 8px;
 }
 
 .overview-title {
   margin: 0;
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: 24px;
 }
 
 .overview-meta {
@@ -120,16 +129,16 @@ button {
   align-items: baseline;
   gap: 16px;
   padding: 14px 0;
-  border-top: 1px solid var(--line);
-  font-size: 18px;
+  border-top: var(--hairline) solid var(--line);
+  font-size: 17px;
 }
 
 .exercise-name {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .exercise-rx {
-  color: var(--accent-tint);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -141,32 +150,129 @@ button {
   gap: 12px;
 }
 
-.start-button {
+.overview-actions .text-btn {
+  align-self: center;
+}
+
+.other-ways {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: var(--hairline) solid var(--line);
+}
+
+.other-ways h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.other-ways-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Primary: the glow color. One per screen. */
+.start-button,
+.primary-button {
   width: 100%;
-  min-height: 68px;
+  min-height: 56px;
   border: 0;
-  border-radius: 16px;
+  border-radius: var(--radius-m);
   background: var(--accent);
-  color: #fff;
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  color: var(--on-accent);
+  font-size: 18px;
+  font-weight: 600;
   cursor: pointer;
 }
 
-.start-button:hover {
-  background: color-mix(in oklab, var(--accent), white 8%);
+.start-button,
+.primary-button.is-large {
+  min-height: 64px;
+  font-size: 20px;
 }
 
-.start-button:active {
+.start-button:hover:not(:disabled),
+.primary-button:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.start-button:active,
+.primary-button:active {
   transform: translateY(1px);
+}
+
+.primary-button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .overview-hint {
   margin: 0;
   text-align: center;
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: 15px;
+  line-height: 1.5;
+}
+
+/* Chips: small pills for options and labels */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.chip.is-static {
+  min-height: 28px;
+  padding: 0 12px;
+  border-color: var(--line);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: default;
+}
+
+.theme-toggle {
+  display: flex;
+  gap: 6px;
+}
+
+.theme-toggle .chip {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.theme-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.theme-dot-light {
+  background: var(--ice-cyan);
+  box-shadow: 0 0 0 1px var(--deep-cyan);
+}
+
+.theme-dot-dark {
+  background: var(--honey-amber);
+  box-shadow: 0 0 0 1px var(--burnt-honey);
 }
 
 /* ---------- Player ---------- */
@@ -174,7 +280,7 @@ button {
 .player {
   position: fixed;
   inset: 0;
-  background: #000; /* the margins around the 9:16 stage on wide screens */
+  background: var(--bg-deep); /* the margins around the 9:16 stage on wide screens */
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -184,7 +290,8 @@ button {
   /* Full screen on phones; a centred 9:16 column on anything wider. */
   width: min(100vw, calc(100dvh * 9 / 16));
   height: 100dvh;
-  background: var(--stage);
+  background: var(--bg);
+  color: var(--text);
   container-type: size;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
@@ -217,24 +324,23 @@ button {
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-m);
   background: transparent;
   color: var(--text);
   cursor: pointer;
 }
 
 .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface-sunk);
 }
 
 .badge {
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
+  padding: 5px 12px;
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-pill);
   color: var(--text-muted);
   font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
+  font-weight: 500;
   text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
@@ -254,15 +360,15 @@ a.badge:hover {
 
 .progress-seg {
   flex: 1;
-  height: 5px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.14);
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
-  background: var(--accent-tint);
+  background: var(--accent);
   transform: scaleX(0);
   transform-origin: left center;
   will-change: transform;
@@ -289,15 +395,16 @@ a.badge:hover {
 }
 
 .figure-dot {
-  fill: var(--accent-tint);
+  fill: var(--figure-joint);
 }
 
 .figure-head {
   fill: var(--figure);
 }
 
+/* the floor is the glow line: like a strip along a baseboard */
 .figure-floor {
-  stroke: rgba(255, 255, 255, 0.14);
+  stroke: var(--glow);
   stroke-linecap: round;
 }
 
@@ -321,32 +428,29 @@ a.badge:hover {
   top: 2cqh;
   transform: translateX(-50%);
   padding: 12px 20px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.62);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
   color: var(--text);
   font-size: max(16px, 2.3cqh);
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
 }
 
 .panel {
   padding: 0 20px max(18px, env(safe-area-inset-bottom));
-  /* a subtle scrim so text stays legible where the figure runs close */
-  background: linear-gradient(to bottom, rgba(16, 22, 19, 0), var(--stage) 3cqh);
-  margin-top: -3cqh;
+  background: var(--bg);
   position: relative;
   text-align: center;
 }
 
 .panel-text {
-  padding-top: 3cqh;
+  padding-top: 2cqh;
 }
 
 .panel-title {
   margin: 0;
   font-size: max(24px, 3.9cqh);
-  font-weight: 700;
-  letter-spacing: -0.01em;
   line-height: 1.15;
 }
 
@@ -360,11 +464,10 @@ a.badge:hover {
 
 .panel-kicker {
   margin: 0;
-  font-size: max(22px, 3.4cqh);
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--accent-tint);
+  font-family: var(--font-head);
+  font-size: max(24px, 3.9cqh);
+  font-weight: var(--weight-head);
+  color: var(--accent);
   line-height: 1.15;
 }
 
@@ -379,7 +482,7 @@ a.badge:hover {
 
 .panel-sub {
   color: var(--text);
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -397,20 +500,21 @@ a.badge:hover {
 }
 
 .panel-big-value {
+  font-family: var(--font-head);
   font-size: max(84px, 15cqh);
-  font-weight: 800;
+  font-weight: var(--weight-head);
   letter-spacing: -0.03em;
 }
 
 .panel-big-suffix {
-  font-size: max(30px, 5.2cqh);
-  font-weight: 700;
+  font-size: max(28px, 4.8cqh);
+  font-weight: 500;
   color: var(--text-muted);
 }
 
 .stage-rest .panel-big-value,
 .stage-prep .panel-big-value {
-  color: var(--accent-tint);
+  color: var(--accent);
 }
 
 .controls {
@@ -427,25 +531,28 @@ a.badge:hover {
   display: grid;
   place-items: center;
   border: 0;
+  border: var(--hairline) solid var(--line-strong);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
+  background: transparent;
   color: var(--text);
   cursor: pointer;
 }
 
 .ctrl:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--surface-sunk);
 }
 
 .ctrl-main {
   width: max(72px, 9cqh);
   height: max(72px, 9cqh);
+  border: 0;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .ctrl-main:hover {
-  background: color-mix(in oklab, var(--accent), white 8%);
+  background: var(--accent);
+  filter: brightness(1.06);
 }
 
 /* ---------- Finish ---------- */
@@ -464,9 +571,13 @@ a.badge:hover {
 .finish-title {
   margin: 0;
   font-size: max(34px, 5.4cqh);
-  font-weight: 800;
-  letter-spacing: -0.01em;
   line-height: 1.1;
+}
+
+.finish-note {
+  margin: -1.5cqh 0 0;
+  color: var(--text-muted);
+  font-size: max(16px, 2.4cqh);
 }
 
 .finish-time {
@@ -478,37 +589,36 @@ a.badge:hover {
 }
 
 .finish-time-value {
+  font-family: var(--font-head);
   font-size: max(72px, 12cqh);
-  font-weight: 800;
+  font-weight: var(--weight-head);
   line-height: 1;
-  color: var(--accent-tint);
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
 
 .finish-time-label {
   font-size: max(16px, 2.4cqh);
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
 }
 
 .restart-button {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  min-height: 64px;
-  padding: 0 34px;
-  border: 0;
-  border-radius: 16px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 22px;
-  font-weight: 700;
+  min-height: 56px;
+  padding: 0 28px;
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .restart-button:hover {
-  background: color-mix(in oklab, var(--accent), white 8%);
+  background: var(--surface-sunk);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -519,20 +629,21 @@ a.badge:hover {
 
 /* ---------- Make from video ---------- */
 
+/* Secondary: a quiet neutral outline */
 .secondary-button {
   width: 100%;
-  min-height: 56px;
-  border: 1px solid color-mix(in oklab, var(--accent-tint), transparent 55%);
-  border-radius: 14px;
+  min-height: 52px;
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius-m);
   background: transparent;
-  color: var(--accent-tint);
-  font-size: 18px;
-  font-weight: 700;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .secondary-button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-sunk);
 }
 
 .secondary-button:disabled {
@@ -543,9 +654,9 @@ a.badge:hover {
 .text-btn {
   border: 0;
   background: transparent;
-  color: var(--accent-tint);
+  color: var(--accent);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
   padding: 6px 4px;
   cursor: pointer;
 }
@@ -571,8 +682,6 @@ a.badge:hover {
 .builder-title {
   margin: 8px 0 0;
   font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
 }
 
 .builder-note {
@@ -591,7 +700,6 @@ a.badge:hover {
 .step-title {
   margin: 0;
   font-size: 20px;
-  font-weight: 700;
 }
 
 .step-hint {
@@ -605,24 +713,24 @@ a.badge:hover {
   display: grid;
   place-items: center;
   min-height: 56px;
-  border-radius: 14px;
+  border-radius: var(--radius-m);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .file-btn:focus-within {
-  outline: 3px solid var(--accent-tint);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
 .video-wrap {
   position: relative;
-  border-radius: 12px;
+  border-radius: var(--radius-m);
   overflow: hidden;
-  background: #000;
+  background: var(--bg-deep);
   line-height: 0;
 }
 
@@ -645,7 +753,7 @@ a.badge:hover {
 
 .file-name {
   margin: -6px 0 0;
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -660,7 +768,8 @@ a.badge:hover {
 
 .trim label,
 .form-grid label,
-.workout-name {
+.workout-name,
+.field {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -674,20 +783,37 @@ a.badge:hover {
 }
 
 .builder input[type='number'],
-.builder input[type='text'] {
+.builder input[type='text'],
+.builder input[type='url'],
+.builder select,
+.builder textarea {
   width: 100%;
   min-height: 48px;
   padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--bg);
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface-sunk);
   color: var(--text);
   font: inherit;
-  font-size: 18px;
+  font-size: 17px;
 }
 
-.builder input:focus-visible {
-  outline: 2px solid var(--accent-tint);
+.builder textarea {
+  padding: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.builder input::placeholder,
+.builder textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.builder input:focus-visible,
+.builder select:focus-visible,
+.builder textarea:focus-visible {
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -710,20 +836,21 @@ a.badge:hover {
   transition: transform 0.15s linear;
 }
 
+/* True errors only: muted mulberry, never red */
 .builder-error {
   margin: 0;
   padding: 12px 14px;
-  border-radius: 10px;
-  background: rgba(220, 80, 60, 0.12);
-  color: #f2b8ad;
+  border-radius: var(--radius-s);
+  background: var(--error-bg);
+  color: var(--error);
   font-size: 15px;
   line-height: 1.45;
 }
 
 .preview-figure {
   height: min(340px, 45dvh);
-  border-radius: 12px;
-  background: var(--stage);
+  border-radius: var(--radius-m);
+  background: var(--bg);
   padding: 8px;
 }
 
@@ -745,29 +872,28 @@ a.badge:hover {
   grid-column: 1 / -1;
 }
 
+/* Option chips (Reps / Timed) */
 .segmented {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  padding: 4px;
-  border-radius: 12px;
-  background: var(--bg);
-  border: 1px solid var(--line);
+  display: flex;
+  gap: 8px;
 }
 
 .segmented button {
-  min-height: 42px;
-  border: 0;
-  border-radius: 9px;
+  min-height: 38px;
+  padding: 0 18px;
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--text-muted);
-  font-size: 16px;
-  font-weight: 700;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 500;
   cursor: pointer;
 }
 
 .segmented button.is-on {
-  background: var(--accent);
-  color: #fff;
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .builder .exercise-list li {
@@ -782,7 +908,7 @@ a.badge:hover {
   width: 36px;
   height: 36px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   background: transparent;
   color: var(--text-muted);
   font-size: 24px;
@@ -791,7 +917,7 @@ a.badge:hover {
 }
 
 .remove-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface-sunk);
   color: var(--text);
 }
 
@@ -811,9 +937,9 @@ a.badge:hover {
   flex-direction: column;
   gap: 12px;
   padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: color-mix(in oklab, var(--surface), black 18%);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--bg);
 }
 
 .movement-head {
@@ -824,14 +950,15 @@ a.badge:hover {
 }
 
 .movement-index {
+  font-family: var(--font-head);
   font-size: 18px;
-  font-weight: 800;
+  font-weight: var(--weight-head);
 }
 
 .movement-time {
   font-variant-numeric: tabular-nums;
-  color: var(--accent-tint);
-  font-weight: 600;
+  color: var(--accent);
+  font-weight: 500;
 }
 
 .sr-only {
@@ -856,7 +983,7 @@ a.badge:hover {
 }
 
 .exercise-meta {
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
@@ -865,16 +992,16 @@ a.badge:hover {
   flex: none;
   width: 36px;
   height: 36px;
-  border: 0;
+  border: var(--hairline) solid var(--line-strong);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--accent-tint);
+  background: transparent;
+  color: var(--accent);
   font-size: 13px;
   cursor: pointer;
 }
 
 .play-one-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--surface-sunk);
 }
 
 .builder .exercise-list li {
@@ -882,7 +1009,7 @@ a.badge:hover {
 }
 
 .stage-work .panel-sub {
-  color: var(--accent-tint);
+  color: var(--text-muted);
 }
 
 /* Verification: confidence, editing, other side */
@@ -902,23 +1029,22 @@ a.badge:hover {
 
 .confidence {
   font-size: 13px;
-  font-weight: 600;
-  color: var(--text-faint);
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
 .confidence-high {
-  color: var(--accent-tint);
+  color: var(--accent);
 }
 
 .tag {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 10px;
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-pill);
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-weight: 500;
   margin-left: 6px;
   vertical-align: middle;
 }
@@ -927,18 +1053,19 @@ a.badge:hover {
   margin-left: 0;
 }
 
+/* "Check this one": a calm accent outline, not an alarm */
 .tag-check {
-  background: rgba(240, 180, 60, 0.18);
-  color: #f3cf86;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .movement-card.is-low {
-  border-color: rgba(240, 180, 60, 0.45);
+  border-color: var(--accent);
 }
 
 .reasons {
   margin: -6px 0 0;
-  color: #f3cf86;
+  color: var(--text-muted);
   font-size: 14px;
   line-height: 1.45;
 }
@@ -983,13 +1110,14 @@ a.badge:hover {
 }
 
 .secondary-button.is-suggested {
-  background: color-mix(in oklab, var(--accent), transparent 70%);
-  border-color: var(--accent-tint);
-  color: var(--text);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
+/* Deleting isn't an error: quiet, not red */
 .text-btn.danger {
-  color: #f2a99c;
+  color: var(--text-muted);
 }
 
 .mirror-row {
@@ -997,8 +1125,8 @@ a.badge:hover {
   flex-direction: column;
   gap: 4px;
   padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-s);
+  background: var(--surface-sunk);
 }
 
 .mirror-row .step-hint {
@@ -1011,7 +1139,7 @@ a.badge:hover {
   align-items: center;
   gap: 10px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
 }
 
@@ -1022,19 +1150,133 @@ a.badge:hover {
 }
 
 .manual-add {
-  border: 1px dashed var(--line);
-  border-radius: 12px;
+  border: var(--hairline) dashed var(--line-strong);
+  border-radius: var(--radius-m);
   padding: 12px 14px;
 }
 
 .manual-add summary {
   cursor: pointer;
-  font-weight: 700;
-  color: var(--accent-tint);
+  font-weight: 500;
+  color: var(--accent);
 }
 
 .manual-add[open] {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* ---------- Paste a link ---------- */
+
+.link-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin-top: -2px;
+}
+
+.link-row .step-hint {
+  margin: 0;
+}
+
+/* an indeterminate thin line while a step runs */
+.progress-seg.is-busy .progress-fill {
+  width: 30%;
+  transform: none;
+  animation: busy 1.4s ease-in-out infinite;
+}
+
+@keyframes busy {
+  from {
+    margin-left: -30%;
+  }
+  to {
+    margin-left: 100%;
+  }
+}
+
+.fallback-body {
+  margin-top: 6px;
+}
+
+.fallback-option {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: var(--hairline) solid var(--line);
+}
+
+.option-title {
+  margin: 0;
+  font-size: 17px;
+}
+
+.fallback-option .step-hint {
+  margin: 0;
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 14px;
+  border-left: 2px solid var(--glow);
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+  background: var(--surface-sunk);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.row-tools {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.movement-head .exercise-rx {
+  font-variant-numeric: tabular-nums;
+}
+
+.icon-chip {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.icon-chip:hover:not(:disabled) {
+  background: var(--surface-sunk);
+}
+
+.icon-chip:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-seg.is-busy .progress-fill {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
+.other-ways .overview-hint {
+  text-align: left;
+  margin-top: -4px;
 }

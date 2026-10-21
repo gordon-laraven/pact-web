@@ -1,0 +1,74 @@
+/*
+  PACT brand tokens: every color, font and radius the app uses lives here.
+  Change a value here and every screen follows.
+
+  Brand palette values marked PLACEHOLDER are waiting for the official hex
+  codes. A few are adjusted for reading (WCAG AA, 4.5:1 for text): those are
+  marked "AA" with the brand value they come from. contrast.test.ts checks
+  every text and button pair below, so run `npm test` after changing any.
+*/
+
+:root {
+  /* ----- Brand palette ----- */
+  --bone: #f4efe6; /* PLACEHOLDER: main light background */
+  --mushroom: #b8a99a; /* PLACEHOLDER */
+  --mortar: #8a8178; /* PLACEHOLDER */
+  --warm-iron: #3a3532; /* PLACEHOLDER: main dark background, dark text */
+  --ice-cyan: #5fe0f0; /* light-mode glow: thin lines and small lights only */
+  --deep-cyan: #0a7c8c; /* brand value; 4.29:1 on Bone, so text uses --accent below */
+  --honey-amber: #ffb43a; /* dark-mode glow and main accent */
+  --burnt-honey: #a86a00; /* brand value; 3.88:1 on Bone. AA version: #8a5600 */
+  --mulberry: #7a3b5e; /* PLACEHOLDER: true errors only. Never red. */
+
+  /* ----- Type ----- */
+  --font-head: 'Sora Variable', 'Sora', 'Inter Variable', system-ui, sans-serif;
+  --font-body: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --weight-head: 600;
+
+  /* ----- Shape ----- */
+  --radius-s: 8px;
+  --radius-m: 12px;
+  --radius-l: 16px;
+  --radius-pill: 999px;
+  --hairline: 1px;
+
+  /* ----- Light · Cyan (default) ----- */
+  --bg: var(--bone);
+  --bg-deep: #e9e2d6; /* around the 9:16 player on wide screens */
+  --surface: #fbf8f2; /* cards */
+  --surface-sunk: #efe9de; /* inputs, chips, round controls */
+  --line: #ddd4c7; /* hairlines between things */
+  --line-strong: var(--mortar); /* input and outline-button borders (3:1) */
+  --text: var(--warm-iron);
+  --text-muted: #6b635b; /* AA: Mortar darkened (Mortar is 3.34:1 on Bone) */
+  --accent: #076b79; /* AA: Deep Cyan darkened. Text, icons, primary button */
+  --on-accent: var(--bone); /* text on the primary button */
+  --glow: var(--ice-cyan); /* thin lines, small indicators, never text */
+  --error: var(--mulberry);
+  --error-bg: #f2e6ea;
+  --figure: var(--warm-iron);
+  --figure-joint: var(--accent);
+
+  color-scheme: light;
+}
+
+/* ----- Dark · Amber ----- */
+:root[data-theme='dark'] {
+  --bg: var(--warm-iron);
+  --bg-deep: #2e2a27;
+  --surface: #45403c;
+  --surface-sunk: #2e2a27;
+  --line: #57504b;
+  --line-strong: #9a9087; /* Mortar lifted: Mortar is 2.68:1 on the dark card */
+  --text: var(--bone);
+  --text-muted: #c2b4a6; /* AA: Mushroom lifted (Mushroom is 4.47:1 on the dark card) */
+  --accent: var(--honey-amber);
+  --on-accent: var(--warm-iron);
+  --glow: var(--honey-amber);
+  --error: #e3aacb; /* AA: Mulberry lifted (Mulberry is 1.51:1 on Warm Iron) */
+  --error-bg: #4a3c42;
+  --figure: var(--bone);
+  --figure-joint: var(--honey-amber);
+
+  color-scheme: dark;
+}

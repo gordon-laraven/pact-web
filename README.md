@@ -97,6 +97,11 @@ On the overview, press **Make a workout from video**.
   - **Rest:** still while standing, kneeling, sitting or lying on the mat. These are never holds.
   - **Hold:** still in an exercise position for at least 5 s. It gets high confidence if held up on the arms (plank, side plank), low confidence otherwise.
   - Anything else is a **movement**.
+- **Rhythm decides close calls.** The splitter cuts eagerly, then rhythm decides which pieces to put back together. A stretch's rhythm score says how steadily it repeats.
+  - **Look-alikes stay apart:** two neighbouring pieces that look alike but each have a steady rhythm of their own, and *lose* it when joined, are different exercises. This happens with combo moves that share the same legs and differ in the arms.
+  - **Halves rejoin:** pieces that only repeat steadily when joined (a slow rep cut in half) are rejoined.
+  - **Leftovers:** short leftovers between two movements, usually a transition plus a first rep, are shared out where both neighbours keep their steadiest rhythm.
+  - **Boundaries:** where two movements meet directly, the boundary is nudged (up to 2 s) to where both repeat most steadily.
 - **Merging:** neighbouring pieces that look like the same movement are merged into one entry.
   - If a rest or a break separates them, they become **separate sets** of that entry.
   - The same movement coming back after a *different* movement stays a **separate entry**.
@@ -110,7 +115,9 @@ On the overview, press **Make a workout from video**.
 - **Merge:** neighbouring fragments of the same movement are merged.
 - **Clamp:** timestamps are clamped to the video, and ranges never overlap.
 - **Confidence:** each movement is rated high/medium/low, with plain reasons: irregular reps, few reps, the body lost in frames, found on a second look.
-- **One-sided:** a movement is one-sided when left and right limbs sit in clearly different places. If the same move follows with the sides swapped, both are marked as "both sides shown", labelled Left/Right, and the button isn't suggested.
+- **One-sided:**
+  - From the side, a movement is one-sided when left and right limbs sit in clearly different places.
+  - From the front, it's one-sided when one leg or arm moves much more than the other. Positions aren't compared there, because a slight camera angle shifts left and right apart anyway. If the same move follows with the sides swapped, both are marked as "both sides shown", labelled Left/Right, and the button isn't suggested.
 - **Nothing found:** if there's no clear movement at all, you get a friendly message instead of an error.
 
 **Debug file.** After analysing, **Download debug file** saves everything behind the result:
@@ -143,7 +150,9 @@ In dev builds (`npm run dev`), **Load a debug file instead** re-runs the splitti
 - One-sided detection compares where the left and right limbs sit. Single-arm moves filmed exactly side-on can be missed, because the hidden arm is drawn behind the visible one.
 - A glute-bridge-style hold (still, hips up, arms not holding the body up) is rated low confidence rather than high.
 - Two different exercises that look very alike from the camera's angle (e.g. a squat and a sumo squat) may be kept as one movement. The same exercise filmed from a very different angle may be split into two.
-- Movements shorter than 2 seconds are treated as transitions.
+- Movements shorter than 2 seconds are treated as transitions. A short burst (2–4 s) is kept only if it shows 2.5 or more clean repetitions.
+- A big change of tempo partway through one exercise can split it into two entries (each has its own rhythm). Delete or rename one if that happens.
+- A short transition (like getting down to the floor) can be attached to the start or end of a neighbouring movement. That's on purpose, so a first or last rep is never cut off.
 - In dev builds, the raw tracking of the last analysed clip is available in the browser console as `window.__pactClip`, for debugging.
 
 `src/extract/mediapipe.ts` is the only browser-specific part.

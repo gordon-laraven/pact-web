@@ -1,14 +1,17 @@
 # pact-web
 
-**PACT** ("a promise to yourself") will eventually turn workout reels and shorts into long-form, follow-along workout videos.
+**pact** ("Keep the pact.") will eventually turn workout reels and shorts into long-form, follow-along workout videos.
 
 This repo is a **frontend-only prototype** that tests one thing: **the hands-free feel**. You press Start once and follow a full workout, like putting in a P90X tape. A stick figure demonstrates each move. Reps, sets, rest timers and spoken cues advance on their own. You never touch the screen mid-workout.
 
-It also has a first version of the core idea: **Make a workout from video.** Pick a clip on your device. PACT tracks the body, splits the video into its separate movements, cuts one clean rep of each, and turns them into stick-figure moves for a hands-free workout. See [Make a workout from video](#make-a-workout-from-video).
+It can also **read a pasted link** (a YouTube Short, Instagram or Facebook reel, TikTok) to find which exercises are in it. See [Paste a link](#paste-a-link).
+
+It also has a first version of the core idea: **Make a workout from video.** Pick a clip on your device. pact tracks the body, splits the video into its separate movements, cuts one clean rep of each, and turns them into stick-figure moves for a hands-free workout. See [Make a workout from video](#make-a-workout-from-video).
 
 ### What it is not (yet)
 
-- No backend, accounts, database or AI. Workouts you build from videos live in memory and are gone when you refresh.
+- No accounts or database. Workouts you build live in memory and are gone when you refresh.
+- The only server code is the small link API in `server/` (it runs inside `npm run dev` / `npm run preview`). The only AI is the optional Gemini step for links.
 - No downloading from Facebook, Instagram or YouTube: you pick a video file you have the rights to. It never leaves your device.
 - Movement names and form cues for a video are typed in by you; sets, reps and durations are detected. AI naming will come later.
 - The sample workout is hand-written (`src/data/sampleWorkout.ts`), and so are its animations (`src/animation/library/`).
@@ -53,16 +56,71 @@ In **dev builds only** (`pnpm dev`), append `?speed=N` to multiply the player cl
 | Work begins | Long beep. On an exercise's first set, its name is also spoken. |
 | Rest begins | "Rest" |
 | Halfway through a time-based set of 30 s or more | "Halfway" |
-| End | "Done. Workout complete." |
+| End | "Done. Pact kept." |
 
 If the speech API is missing or fails, the workout runs silently, with no errors.
 
+## Paste a link
+
+On the home screen, **Paste a link** takes a YouTube / Shorts, Instagram, Facebook or TikTok link and finds the exercises in it. **Nothing from the video is downloaded, stored or re-hosted.** Only the post's public title and caption are read, and the workout still plays with the stick figure. The original upload flow is unchanged and is one tap away from here.
+
+### The pipeline
+
+It stops at the first step that gives a usable list. Each step is its own function (and its own API route, so the screen can say "Reading the post…" / "Watching the video…"):
+
+| Step | What it does | Code |
+|---|---|---|
+| 1. Check the link | Validates the URL, works out the platform, normalises YouTube links to `watch?v=` | `server/link/platform.ts` → `parseLink` |
+| 2. Text first | Reads public text only: official oEmbed (YouTube, TikTok, and Instagram/Facebook when a Meta token is set), the YouTube Data API description (optional key), or the page's public title/description tags. No logins, no cookies. Then it extracts a list from that text: Gemini when `GEMINI_API_KEY` is set, a plain-rules parser otherwise. | `metadata.ts` → `readPostText`, `extract.ts` → `extractFromText` |
+| 3. Video model (YouTube only) | If step 2 finds no list, Gemini watches the public YouTube video by its URL (`file_data.file_uri`). Gemini fetches it; this server never does. | `extract.ts` → `extractFromYouTube` |
+| 4. Fallback | Two options, presented as one more step rather than an error: type or paste the list (same extraction as step 2), or open the existing upload flow. | `src/components/LinkBuilder.tsx` |
+
+Before building, the list is shown for checking. You can rename, reorder (↑ ↓), add and remove moves, change sets, reps, seconds and rest, and pick the stick-figure move. A note appears when confidence is low.
+
+Every path returns the same shape (`src/link/types.ts`), which `toWorkout()` (`src/link/toWorkout.ts`) turns into the app's normal `Workout`, so the player is untouched:
+
+```json
+{ "title": "Leg day", "source": "caption" | "video-model" | "typed",
+  "exercises": [{ "name": "Squat", "sets": 3, "reps": 12, "duration_seconds": null, "rest_seconds": null, "notes": null }],
+  "confidence": "high" | "medium" | "low" }
+```
+
+(`sets` and `rest_seconds` were added to the shape, because captions often include them.)
+
+Rate limits, timeouts and bad links come back as reason codes (`src/link/types.ts` → `LinkFailure`) and become calm messages (`src/link/messages.ts`). Every outside request has a timeout and a size cap. Pages on private or local addresses are never fetched. Each visitor can make 30 link requests per 10 minutes.
+
+### Environment variables (server-side only)
+
+Put them in `.env.local` next to `package.json` (it's git-ignored), then restart `npm run dev`. **Never prefix them with `VITE_`**, because Vite would then ship them to the browser.
+
+```bash
+GEMINI_API_KEY=...        # Google AI Studio key. Turns on AI caption reading and the YouTube video step.
+GEMINI_MODEL=gemini-flash-latest   # optional; any Gemini model id that accepts video
+YOUTUBE_API_KEY=...       # optional; full YouTube descriptions (oEmbed only gives the title)
+META_OEMBED_TOKEN=app-id|client-token   # optional; Instagram/Facebook oEmbed
+```
+
+With no keys at all, links still work wherever the caption lists the moves clearly (for example TikTok captions or YouTube titles), and typed lists always work. Instagram and Facebook usually hide captions from logged-out readers, so expect the fallback there unless a Meta token is set.
+
+**Before launch:** verify Google's current Gemini API terms and limits for YouTube URL input. It has been a preview feature, works for public videos only, and has a daily free-tier cap on hours of video. Also check YouTube's and Meta's terms for oEmbed and the Data API (see the comment in `server/link/extract.ts`).
+
+### Hosting
+
+`npm run dev` and `npm run preview` include the API (`server/vitePlugin.ts`). On a static host without it, link reading shows the fallback, and typed lists are parsed in the browser instead. To host it elsewhere, mount `createLinkApi(env)` from `server/link/api.ts`: it's a plain Node `(req, res, next)` middleware.
+
+## Brand: where to change things
+
+- **Colors, fonts, radii:** `src/theme/tokens.css`. It's the only file with color values. Values marked `PLACEHOLDER` wait for official hex codes, and values marked `AA` were adjusted for contrast. After changing a color, run `npm test`: `src/theme/contrast.test.ts` checks every text and button pair against WCAG AA in both modes.
+- **Light · Cyan / Dark · Amber:** `src/theme/theme.ts` (follows the system until you pick, then remembers the pick). A matching snippet in `index.html` sets the mode before first paint.
+- **Wordmark:** `src/components/Wordmark.tsx`, drawn as SVG strokes. Swap the final logo in there; `mono` gives a one-color version. The favicon is `public/favicon.svg`.
+- **Fonts:** Sora (headlines, semibold) and Inter (body) are bundled with the app via `@fontsource-variable/*` and imported in `src/main.tsx`. The family names are in `tokens.css` (`--font-head`, `--font-body`).
+
 ## Make a workout from video
 
-On the overview, press **Make a workout from video**.
+On the overview, press **Upload a video** (or pick it from the fallback after pasting a link).
 
 1. **Choose a clip.** Best results come from one person, whole body in frame, filmed side-on or facing the camera. A clip can contain several exercises. Use **Start / End** if you only want part of it.
-2. **Analyze movement.** PACT steps through the clip at 15 frames per second with [MediaPipe Pose](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker) and draws the tracked skeleton over the video.
+2. **Find the moves.** pact steps through the clip at 15 frames per second with [MediaPipe Pose](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker) and draws the tracked skeleton over the video.
    - It runs on your computer's graphics card, falling back to the processor.
    - The first run downloads the ~9 MB pose model from Google; after that it's cached.
 3. **Check the moves.** There's one card per movement, in video order. Each card has:
@@ -91,7 +149,7 @@ On the overview, press **Make a workout from video**.
   - Whole-body bounce is included, which catches calf raises and jumps.
   - In clear side views, it also records which leg and arm are forward, so a left-leg and a right-leg lunge differ.
 - **Breaks:** the video is cut wherever nobody is tracked for 0.7 s or more (a title card, a cut away), and at camera cuts (the body jumps in the frame and changes size).
-- **Changes of exercise:** at every quarter second, PACT compares the 3 s before with the 3 s after: the average posture, and how much each body part moves. A big difference marks a new movement, and the exact moment is then pinned down with 1 s windows. Back-to-back movements with no break are split this way.
+- **Changes of exercise:** at every quarter second, pact compares the 3 s before with the 3 s after: the average posture, and how much each body part moves. A big difference marks a new movement, and the exact moment is then pinned down with 1 s windows. Back-to-back movements with no break are split this way.
 - **Labelling the pieces:**
   - **Transition:** shorter than 2 s, like getting down to the floor. It's absorbed into the movement before it if it looks like that move, otherwise dropped.
   - **Rest:** still while standing, kneeling, sitting or lying on the mat. These are never holds.
@@ -185,7 +243,14 @@ src/
     segment.ts                one video -> its movements, in order (pure, unit-tested)
     extract.ts                one movement's landmarks -> one looping Animation (pure, unit-tested)
     mediapipe.ts              runs MediaPipe Pose over a <video>, frame by frame
-  components/VideoBuilder.tsx "Make a workout from video" screen
+  components/VideoBuilder.tsx "Make it from a video" (upload) screen
+  components/LinkBuilder.tsx  "Paste a link" screen
+  components/Wordmark.tsx     the wordmark (swap the logo here)
+  link/                       link list shape, rules parser, client pipeline, toWorkout (browser + server)
+  theme/                      tokens.css (all colors and fonts), theme.ts (light/dark), contrast test
+server/
+  vitePlugin.ts               mounts the link API on the dev and preview servers
+  link/                       platform, metadata, gemini, extract, api: one file per pipeline step
 ```
 
 **One clock drives everything.** Each frame, `Player` does:

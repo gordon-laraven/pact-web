@@ -4,13 +4,13 @@
 
 This repo is a **frontend-only prototype** that tests one thing: **the hands-free feel**. You press Start once and follow a full workout, like putting in a P90X tape. A stick figure demonstrates each move. Reps, sets, rest timers and spoken cues advance on their own. You never touch the screen mid-workout.
 
-It also has a first version of the core idea: **Make a workout from video.** Pick a clip on your device, PACT tracks the body, finds the repeating movement, cuts one clean rep, and turns it into a stick-figure move you can put in a hands-free workout. See [Make a workout from video](#make-a-workout-from-video).
+It also has a first version of the core idea: **Make a workout from video.** Pick a clip on your device. PACT tracks the body, splits the video into its separate movements, cuts one clean rep of each, and turns them into stick-figure moves for a hands-free workout. See [Make a workout from video](#make-a-workout-from-video).
 
 ### What it is not (yet)
 
 - No backend, accounts, database or AI. Workouts you build from videos live in memory and are gone when you refresh.
 - No downloading from Facebook, Instagram or YouTube: you pick a video file you have the rights to. It never leaves your device.
-- The exercise name, sets and reps for a video clip are typed in by you; AI will do that later.
+- Movement names and form cues for a video are typed in by you; sets, reps and durations are detected. AI naming will come later.
 - The sample workout is hand-written (`src/data/sampleWorkout.ts`), and so are its animations (`src/animation/library/`).
 
 ## Run it
@@ -61,14 +61,34 @@ If the speech API is missing or fails, the workout runs silently, with no errors
 
 On the overview, press **Make a workout from video**.
 
-1. **Choose a clip.** Best results come from one person, whole body in frame, filmed side-on or facing the camera, with one exercise per clip. Use **Start / End** to trim to the part with the exercise.
+1. **Choose a clip.** Best results come from one person, whole body in frame, filmed side-on or facing the camera. A clip can contain several exercises. Use **Start / End** if you only want part of it.
 2. **Analyze movement.** PACT steps through the clip at 15 frames per second with [MediaPipe Pose](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker) and draws the tracked skeleton over the video.
    - It runs on your computer's graphics card, falling back to the processor.
    - The first run downloads the ~9 MB pose model from Google; after that it's cached.
-3. **Check the move.** The preview loops the extracted rep and shows how many reps were found, the seconds per rep, and the view. Name it, choose Reps or Timed, set sets, reps and rest, and **Add to workout**.
-4. Add more clips, then **Start workout**. It plays in the same hands-free player, with the badge reading "From your videos".
+3. **Check the moves.** There's one card per movement, in video order. Each card has:
+   - **▶ 0:13–0:22**, which plays that part of your video.
+   - A preview loop of the extracted rep.
+   - What was detected: sets, reps per set, seconds per rep, and the view.
 
-**How extraction works** (`src/extract/extract.ts`, pure and unit-tested):
+   Name each movement, adjust Reps/Timed, sets, reps and rest, and optionally add form cues. Untick any you don't want, then **Add to workout**.
+4. Add more clips if you like. In the workout list, **▶** plays one movement on its own. **Start workout** plays them all in order in the hands-free player, with the badge reading "From your videos". Form cues show under the counter while you do that exercise.
+
+**How a video is split into movements** (`src/extract/segment.ts`, pure and unit-tested):
+- **Describe each moment:** each frame's posture is measured relative to the hips, in spine lengths. Turning around doesn't count as a change.
+- **Breaks:** the video is cut wherever nobody is tracked for 0.7 s or more (a title card, a cut away), and at camera cuts (the body jumps in the frame and changes size).
+- **Changes of exercise:** at every quarter second, PACT compares the 3 s before with the 3 s after: the average posture, and how much each body part moves. A big difference marks a new movement, and the exact moment is then pinned down with 1 s windows. Back-to-back movements with no break are split this way.
+- **Labelling the pieces:**
+  - **Transition:** shorter than 2 s, like getting down to the floor. It's absorbed into the movement before it if it looks like that move, otherwise dropped.
+  - **Rest:** standing still and upright.
+  - **Hold:** still but not upright (plank).
+  - Anything else is a **movement**.
+- **Merging:** neighbouring pieces that look like the same movement are merged into one entry.
+  - If a rest or a break separates them, they become **separate sets** of that entry.
+  - The same movement coming back after a *different* movement stays a **separate entry**.
+- **Extraction:** each set is extracted with the single-movement step below. The loop comes from the best-tracked set, and reps are counted per set.
+- **Nothing found:** if there's no clear movement at all, you get a friendly message instead of an error.
+
+**How one movement is extracted** (`src/extract/extract.ts`, pure and unit-tested):
 - **Map:** MediaPipe's 33 landmarks become our 14 joints. The head is the midpoint of the ears; the neck is the midpoint of the shoulders.
 - **Clean up:** frames without a person are filled in from their neighbours, everything is resampled to 30 fps, single-frame spikes are removed and the jitter is smoothed.
 - **View and facing:** if the shoulders overlap it's a side view, otherwise front. Side views are mirrored to face right, like the library.
@@ -83,7 +103,9 @@ On the overview, press **Make a workout from video**.
 **Known limits:**
 - Side views of arms are the weak spot. The tracker has to guess the hidden arm and can mislocate the visible one when it crosses the face or body. Check the preview, and if an arm looks wrong, try trimming to a cleaner section or a clip with better lighting.
 - Analysis speed depends on the device: a few seconds per 10 s of video with a decent graphics card, much slower without one.
-- One exercise per clip. Splitting a multi-exercise reel automatically is a later (AI) step.
+- Splitting is based on how the body moves only. Title cards and the instructor naming the next move aren't read; that needs the later AI step.
+- Two different exercises that look very alike from the camera's angle (e.g. a squat and a sumo squat) may be kept as one movement. The same exercise filmed from a very different angle may be split into two.
+- Movements shorter than 2 seconds are treated as transitions.
 - In dev builds, the raw tracking of the last analysed clip is available in the browser console as `window.__pactClip`, for debugging.
 
 `src/extract/mediapipe.ts` is the only browser-specific part.
@@ -113,7 +135,8 @@ src/
     Overview.tsx, ProgressBar.tsx, AttributionBadge.tsx, icons.tsx
   player/                     browser wrappers: audio.ts, wakeLock.ts, fullscreen.ts, format.ts
   extract/
-    extract.ts                pose landmarks -> one looping Animation (pure, unit-tested)
+    segment.ts                one video -> its movements, in order (pure, unit-tested)
+    extract.ts                one movement's landmarks -> one looping Animation (pure, unit-tested)
     mediapipe.ts              runs MediaPipe Pose over a <video>, frame by frame
   components/VideoBuilder.tsx "Make a workout from video" screen
 ```
@@ -143,6 +166,8 @@ type Exercise = {
   animationId: string;           // key into the animation library
   sets: { reps?: number; holdSec?: number; restAfterSec: number }[];
   tempoSec?: number;             // seconds per rep, rep_based only (override of animation default)
+  clip?: { startSec: number; endSec: number };  // made from video: where this movement is in the source video
+  notes?: string;                // form cues, shown under the counter during the exercise
 };
 ```
 

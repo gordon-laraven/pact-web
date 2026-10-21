@@ -1,4 +1,5 @@
 import { samplePose } from '../animation/interpolate'
+import { squat as SQUAT } from '../animation/library/squat'
 import { along, BODY, FLOOR, ik, lerp, sidePose, v, wave } from '../animation/rig'
 import type { Animation, Joint, Pose } from '../types'
 import { JOINTS } from '../types'
@@ -205,4 +206,14 @@ function lungeFreeStand(): Pose {
   const elbow = along(shoulder, 92, BODY.upperArm)
   const wrist = along(elbow, 90, BODY.forearm)
   return sidePose(along(neck, -90, BODY.neck), neck, { shoulder, elbow, wrist, hip, knee, ankle })
+}
+
+/** Side-view squat whose arms do something else: a front raise or an overhead press (combo moves). */
+export function squatComboPose(t: number, arms: 'front-raise' | 'press'): Pose {
+  const pose = samplePose(SQUAT, t)
+  const s = wave(t)
+  const deg = arms === 'press' ? lerp(80, -92, s) : lerp(85, -5, s)
+  const elbow = along(pose.lShoulder, deg, BODY.upperArm)
+  const wrist = along(elbow, deg + (arms === 'press' ? -4 : 0), BODY.forearm)
+  return { ...pose, lElbow: elbow, rElbow: elbow, lWrist: wrist, rWrist: wrist }
 }

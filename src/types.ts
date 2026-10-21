@@ -16,6 +16,8 @@ export type Exercise = {
   animationId: string // key into the animation library
   sets: { reps?: number; holdSec?: number; restAfterSec: number }[]
   tempoSec?: number // seconds per rep, rep_based only (override of animation default)
+  clip?: { startSec: number; endSec: number } // where this movement appears in the source video
+  notes?: string // form cues or other notes, shown while doing the exercise
 }
 
 export type Joint =

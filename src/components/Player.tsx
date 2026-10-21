@@ -66,8 +66,9 @@ function toView(st: PlayerState, playing: boolean, activeSec: number): View {
             setLabel,
             big: String(st.repsDone),
             bigSuffix: `/ ${st.targetReps}`,
+            sub: st.exercise!.notes ?? null,
           }
-        : { ...base, kind: 'work', title: st.exercise!.name, setLabel, big: countdown, bigSuffix: 'sec' }
+        : { ...base, kind: 'work', title: st.exercise!.name, setLabel, big: countdown, bigSuffix: 'sec', sub: st.exercise!.notes ?? null }
   }
 }
 

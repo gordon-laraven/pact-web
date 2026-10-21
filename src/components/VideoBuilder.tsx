@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { loopSecFor, registerAnimation } from '../animation/library'
 import { buildTimeline } from '../engine/timeline'
-import { extractAnimation, ExtractError, type ExtractResult, type Landmark } from '../extract/extract'
+import { ExtractError, type Landmark } from '../extract/extract'
 import { OVERLAY_BONES, trackVideo } from '../extract/mediapipe'
+import { extractMovements, type Movement } from '../extract/segment'
 import { formatClock, prescription } from '../player/format'
 import type { Exercise, Workout } from '../types'
 import { AnimationPreview } from './AnimationPreview'
 
-// "Make from video": pick a clip, track the body, extract one clean rep, and
-// add it to a workout. Everything happens in the browser; nothing is uploaded.
+// "Make from video": pick a clip, track the body, split it into its movements,
+// extract one clean rep of each, and add them to a workout. Everything happens
+// in the browser; nothing is uploaded.
 
 export type Draft = { title: string; exercises: Exercise[] }
 
@@ -22,10 +24,38 @@ type Props = {
 type Status =
   | { kind: 'idle' }
   | { kind: 'analyzing'; progress: number }
-  | { kind: 'done'; result: ExtractResult }
+  | { kind: 'done'; movements: Movement[] }
   | { kind: 'error'; message: string }
 
-type Form = { name: string; type: Exercise['type']; sets: number; reps: number; holdSec: number; restSec: number; tempoSec: number }
+type Form = {
+  include: boolean
+  name: string
+  notes: string
+  type: Exercise['type']
+  sets: number
+  reps: number
+  holdSec: number
+  restSec: number
+  tempoSec: number
+}
+
+/** Starting values for a movement's form, from what was detected in the video. */
+function formFor(m: Movement, n: number): Form {
+  const hold = m.result.kind === 'hold'
+  const reps = m.sets.map((s) => s.reps).filter((r) => r > 0)
+  const durations = m.sets.map((s) => s.end - s.start)
+  return {
+    include: true,
+    name: `Movement ${n}`,
+    notes: '',
+    type: hold ? 'time_based' : 'rep_based',
+    sets: m.sets.length,
+    reps: reps.length ? Math.max(...reps) : 10,
+    holdSec: Math.max(5, Math.round(Math.max(...durations))),
+    restSec: 15,
+    tempoSec: clamp(m.result.secPerRep, 0.5, 10),
+  }
+}
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 const num = (e: ChangeEvent<HTMLInputElement>) => Number(e.target.value)
@@ -38,7 +68,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
   const [duration, setDuration] = useState(0)
   const [range, setRange] = useState({ start: 0, end: 0 })
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
-  const [form, setForm] = useState<Form | null>(null)
+  const [forms, setForms] = useState<Form[]>([])
 
   // Release the video and stop any analysis when leaving the screen.
   useEffect(() => () => abort.current?.abort(), [])
@@ -51,7 +81,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
     abort.current?.abort()
     setFile({ name: f.name, url: URL.createObjectURL(f) })
     setStatus({ kind: 'idle' })
-    setForm(null)
+    setForms([])
     clearOverlay()
   }
 
@@ -98,7 +128,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
     abort.current?.abort()
     const controller = new AbortController()
     abort.current = controller
-    setForm(null)
+    setForms([])
     setStatus({ kind: 'analyzing', progress: 0 })
     try {
       const clip = await trackVideo(v, {
@@ -110,18 +140,10 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
       })
       // Dev-only: lets you inspect raw tracking from the console (window.__pactClip).
       if (import.meta.env.DEV) (window as unknown as { __pactClip?: unknown }).__pactClip = clip
-      const result = extractAnimation(clip, `video-${Date.now().toString(36)}`)
-      registerAnimation(result.animation)
-      setStatus({ kind: 'done', result })
-      setForm({
-        name: `Exercise ${draft.exercises.length + 1}`,
-        type: result.kind === 'hold' ? 'time_based' : 'rep_based',
-        sets: 2,
-        reps: 10,
-        holdSec: 30,
-        restSec: 15,
-        tempoSec: clamp(result.secPerRep, 0.5, 10),
-      })
+      const movements = extractMovements(clip, `video-${Date.now().toString(36)}`)
+      movements.forEach((m) => registerAnimation(m.result.animation))
+      setStatus({ kind: 'done', movements })
+      setForms(movements.map((m, i) => formFor(m, draft.exercises.length + i + 1)))
     } catch (err) {
       if (controller.signal.aborted) return
       const message =
@@ -139,33 +161,66 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
     clearOverlay()
   }
 
-  const add = () => {
-    if (status.kind !== 'done' || !form) return
-    const set =
-      form.type === 'rep_based'
-        ? { reps: clamp(Math.round(form.reps), 1, 200), restAfterSec: clamp(form.restSec, 0, 600) }
-        : { holdSec: clamp(Math.round(form.holdSec), 1, 600), restAfterSec: clamp(form.restSec, 0, 600) }
-    const exercise: Exercise = {
-      id: `${status.result.animation.id}-ex`,
-      name: form.name.trim() || `Exercise ${draft.exercises.length + 1}`,
-      type: form.type,
-      animationId: status.result.animation.id,
-      sets: Array.from({ length: clamp(Math.round(form.sets), 1, 20) }, () => ({ ...set })),
-      tempoSec: form.type === 'rep_based' ? clamp(form.tempoSec, 0.5, 10) : undefined,
+  /** Play one movement's part of the source video, then stop. */
+  const watch = (m: Movement) => {
+    const v = video.current
+    if (!v) return
+    v.currentTime = m.start
+    const stop = () => {
+      if (v.currentTime >= m.end) {
+        v.pause()
+        v.removeEventListener('timeupdate', stop)
+      }
     }
-    onChange({ ...draft, exercises: [...draft.exercises, exercise] })
+    v.addEventListener('timeupdate', stop)
+    void v.play().catch(() => v.removeEventListener('timeupdate', stop))
+    v.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
+  const add = () => {
+    if (status.kind !== 'done') return
+    const exercises: Exercise[] = []
+    status.movements.forEach((m, i) => {
+      const form = forms[i]
+      if (!form?.include) return
+      const set =
+        form.type === 'rep_based'
+          ? { reps: clamp(Math.round(form.reps), 1, 200), restAfterSec: clamp(form.restSec, 0, 600) }
+          : { holdSec: clamp(Math.round(form.holdSec), 1, 600), restAfterSec: clamp(form.restSec, 0, 600) }
+      exercises.push({
+        id: `${m.result.animation.id}-ex`,
+        name: form.name.trim() || `Movement ${draft.exercises.length + exercises.length + 1}`,
+        type: form.type,
+        animationId: m.result.animation.id,
+        sets: Array.from({ length: clamp(Math.round(form.sets), 1, 20) }, () => ({ ...set })),
+        tempoSec: form.type === 'rep_based' ? clamp(form.tempoSec, 0.5, 10) : undefined,
+        clip: { startSec: round1(m.start), endSec: round1(m.end) },
+        notes: form.notes.trim() || undefined,
+      })
+    })
+    if (exercises.length === 0) return
+    onChange({ ...draft, exercises: [...draft.exercises, ...exercises] })
     setFile(null)
     setStatus({ kind: 'idle' })
-    setForm(null)
+    setForms([])
   }
 
   const remove = (id: string) => onChange({ ...draft, exercises: draft.exercises.filter((e) => e.id !== id) })
 
-  const start = () =>
-    onStart({ id: 'my-workout', title: draft.title.trim() || 'My workout', source: { platform: 'manual' }, exercises: draft.exercises })
+  const workout = (exercises: Exercise[], id: string, title: string): Workout => ({
+    id,
+    title,
+    source: { platform: 'manual' },
+    exercises,
+  })
+  const start = () => onStart(workout(draft.exercises, 'my-workout', draft.title.trim() || 'My workout'))
+  // Play a single movement on its own (with the usual get-ready countdown).
+  const playOne = (ex: Exercise) => onStart(workout([ex], `my-workout-${ex.id}`, ex.name))
 
   const analyzing = status.kind === 'analyzing'
-  const result = status.kind === 'done' ? status.result : null
+  const movements = status.kind === 'done' ? status.movements : null
+  const included = forms.filter((f) => f.include).length
+  const setForm = (i: number, f: Form) => setForms((all) => all.map((x, k) => (k === i ? f : x)))
 
   return (
     <main className="builder">
@@ -179,7 +234,10 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
 
       <section className="overview-card builder-step">
         <h2 className="step-title">1. Choose a clip</h2>
-        <p className="step-hint">One person, whole body in frame, side-on or facing the camera. One exercise per clip works best.</p>
+        <p className="step-hint">
+          One person, whole body in frame, side-on or facing the camera. A clip with several exercises is split into one
+          entry per movement.
+        </p>
         <label className="file-btn">
           {file ? 'Choose a different video' : 'Choose video'}
           <input type="file" accept="video/*" onChange={pick} hidden />
@@ -246,7 +304,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
               </div>
             ) : (
               <button type="button" className="secondary-button" onClick={analyze} disabled={!duration}>
-                {result ? 'Analyze again' : 'Analyze movement'}
+                {movements ? 'Analyze again' : 'Analyze movement'}
               </button>
             )}
             {status.kind === 'error' && <p className="builder-error">{status.message}</p>}
@@ -254,74 +312,31 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
         )}
       </section>
 
-      {result && form && (
+      {movements && (
         <section className="overview-card builder-step">
-          <h2 className="step-title">2. Check the move</h2>
-          <AnimationPreview
-            animation={result.animation}
-            secPerLoop={form.type === 'rep_based' ? form.tempoSec : result.animation.defaultTempoSec}
-          />
-          <p className="result-summary">
-            {result.kind === 'reps'
-              ? `Found ${result.repsFound} rep${result.repsFound === 1 ? '' : 's'} · ${result.secPerRep.toFixed(1)} s per rep · ${result.view} view`
-              : `No repeating movement found, so this is treated as a hold · ${result.view} view`}
-            {result.kind === 'reps' && result.confidence < 0.5 && ' · the reps were irregular, so check the preview'}
-          </p>
-
-          <div className="form-grid">
-            <label className="span-2">
-              <span>Exercise name</span>
-              <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            </label>
-            <div className="span-2 segmented" role="radiogroup" aria-label="Exercise type">
-              {(['rep_based', 'time_based'] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  role="radio"
-                  aria-checked={form.type === t}
-                  className={form.type === t ? 'is-on' : ''}
-                  onClick={() => setForm({ ...form, type: t })}
-                >
-                  {t === 'rep_based' ? 'Reps' : 'Timed'}
-                </button>
-              ))}
-            </div>
-            <label>
-              <span>Sets</span>
-              <input type="number" min={1} max={20} value={form.sets} onChange={(e) => setForm({ ...form, sets: num(e) })} />
-            </label>
-            {form.type === 'rep_based' ? (
-              <label>
-                <span>Reps per set</span>
-                <input type="number" min={1} max={200} value={form.reps} onChange={(e) => setForm({ ...form, reps: num(e) })} />
-              </label>
-            ) : (
-              <label>
-                <span>Seconds per set</span>
-                <input type="number" min={1} max={600} value={form.holdSec} onChange={(e) => setForm({ ...form, holdSec: num(e) })} />
-              </label>
-            )}
-            <label>
-              <span>Rest after each set (sec)</span>
-              <input type="number" min={0} max={600} value={form.restSec} onChange={(e) => setForm({ ...form, restSec: num(e) })} />
-            </label>
-            {form.type === 'rep_based' && (
-              <label>
-                <span>Seconds per rep</span>
-                <input
-                  type="number"
-                  min={0.5}
-                  max={10}
-                  step={0.1}
-                  value={form.tempoSec}
-                  onChange={(e) => setForm({ ...form, tempoSec: num(e) })}
-                />
-              </label>
-            )}
-          </div>
-          <button type="button" className="start-button" onClick={add}>
-            Add to workout
+          <h2 className="step-title">
+            2. Check the {movements.length === 1 ? 'move' : `${movements.length} moves`}
+          </h2>
+          {movements.length > 1 && (
+            <p className="step-hint">
+              Found {movements.length} movements, in the order they appear. Name each one, and untick any you don't want.
+            </p>
+          )}
+          <ol className="movement-list">
+            {movements.map((m, i) => (
+              <MovementCard
+                key={m.result.animation.id}
+                index={i}
+                count={movements.length}
+                movement={m}
+                form={forms[i]}
+                onChange={(f) => setForm(i, f)}
+                onWatch={() => watch(m)}
+              />
+            ))}
+          </ol>
+          <button type="button" className="start-button" onClick={add} disabled={included === 0}>
+            {included === 1 ? 'Add to workout' : `Add ${included} movements to workout`}
           </button>
         </section>
       )}
@@ -329,7 +344,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
       <section className="overview-card builder-step">
         <h2 className="step-title">Your workout</h2>
         {draft.exercises.length === 0 ? (
-          <p className="step-hint">Exercises you add appear here. Add one clip per exercise, then press Start.</p>
+          <p className="step-hint">Movements you add appear here, in order. Add as many clips as you like, then press Start.</p>
         ) : (
           <>
             <label className="workout-name">
@@ -339,7 +354,19 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
             <ol className="exercise-list">
               {draft.exercises.map((ex) => (
                 <li key={ex.id}>
-                  <span className="exercise-name">{ex.name}</span>
+                  <button type="button" className="play-one-btn" aria-label={`Play ${ex.name} on its own`} onClick={() => playOne(ex)}>
+                    ▶
+                  </button>
+                  <span className="exercise-main">
+                    <span className="exercise-name">{ex.name}</span>
+                    {(ex.clip || ex.notes) && (
+                      <span className="exercise-meta">
+                        {ex.clip && `${formatClock(ex.clip.startSec)}–${formatClock(ex.clip.endSec)} in video`}
+                        {ex.clip && ex.notes && ' · '}
+                        {ex.notes}
+                      </span>
+                    )}
+                  </span>
                   <span className="exercise-rx">{prescription(ex)}</span>
                   <button type="button" className="remove-btn" aria-label={`Remove ${ex.name}`} onClick={() => remove(ex.id)}>
                     ×
@@ -363,6 +390,106 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
         </div>
       )}
     </main>
+  )
+}
+
+type CardProps = {
+  index: number
+  count: number
+  movement: Movement
+  form: Form
+  onChange: (form: Form) => void
+  onWatch: () => void
+}
+
+/** One detected movement: where it is in the video, a preview, and its settings. */
+function MovementCard({ index, count, movement: m, form, onChange, onWatch }: CardProps) {
+  const r = m.result
+  const set = (patch: Partial<Form>) => onChange({ ...form, ...patch })
+  const detected =
+    r.kind === 'reps'
+      ? `${m.sets.length > 1 ? `${m.sets.length} sets · ` : ''}${m.sets.map((s) => s.reps).join(', ')} rep${
+          m.sets.length === 1 && m.sets[0].reps === 1 ? '' : 's'
+        } · ${r.secPerRep.toFixed(1)} s per rep`
+      : `Hold · ${m.sets.map((s) => `${Math.round(s.end - s.start)} s`).join(', ')}`
+  return (
+    <li className={`movement-card${form.include ? '' : ' is-excluded'}`}>
+      <div className="movement-head">
+        {count > 1 && (
+          <label className="include">
+            <input type="checkbox" checked={form.include} onChange={(e) => set({ include: e.target.checked })} />
+            <span className="sr-only">Include movement {index + 1}</span>
+          </label>
+        )}
+        <span className="movement-index">{count > 1 ? `${index + 1}.` : ''}</span>
+        <button type="button" className="text-btn movement-time" onClick={onWatch}>
+          ▶ {formatClock(m.start)}–{formatClock(m.end)}
+        </button>
+      </div>
+      {form.include && (
+        <>
+          <AnimationPreview animation={r.animation} secPerLoop={form.type === 'rep_based' ? form.tempoSec : r.animation.defaultTempoSec} />
+          <p className="result-summary">
+            Detected: {detected} · {r.view} view
+            {r.kind === 'reps' && r.confidence < 0.5 && ' · the reps were irregular, so check the preview'}
+          </p>
+          <div className="form-grid">
+            <label className="span-2">
+              <span>Exercise name</span>
+              <input type="text" value={form.name} onChange={(e) => set({ name: e.target.value })} />
+            </label>
+            <div className="span-2 segmented" role="radiogroup" aria-label="Exercise type">
+              {(['rep_based', 'time_based'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="radio"
+                  aria-checked={form.type === t}
+                  className={form.type === t ? 'is-on' : ''}
+                  onClick={() => set({ type: t })}
+                >
+                  {t === 'rep_based' ? 'Reps' : 'Timed'}
+                </button>
+              ))}
+            </div>
+            <label>
+              <span>Sets</span>
+              <input type="number" min={1} max={20} value={form.sets} onChange={(e) => set({ sets: num(e) })} />
+            </label>
+            {form.type === 'rep_based' ? (
+              <label>
+                <span>Reps per set</span>
+                <input type="number" min={1} max={200} value={form.reps} onChange={(e) => set({ reps: num(e) })} />
+              </label>
+            ) : (
+              <label>
+                <span>Seconds per set</span>
+                <input type="number" min={1} max={600} value={form.holdSec} onChange={(e) => set({ holdSec: num(e) })} />
+              </label>
+            )}
+            <label>
+              <span>Rest after each set (sec)</span>
+              <input type="number" min={0} max={600} value={form.restSec} onChange={(e) => set({ restSec: num(e) })} />
+            </label>
+            {form.type === 'rep_based' && (
+              <label>
+                <span>Seconds per rep</span>
+                <input type="number" min={0.5} max={10} step={0.1} value={form.tempoSec} onChange={(e) => set({ tempoSec: num(e) })} />
+              </label>
+            )}
+            <label className="span-2">
+              <span>Form cues / notes (optional)</span>
+              <input
+                type="text"
+                value={form.notes}
+                placeholder="e.g. chest up, knees out"
+                onChange={(e) => set({ notes: e.target.value })}
+              />
+            </label>
+          </div>
+        </>
+      )}
+    </li>
   )
 }
 

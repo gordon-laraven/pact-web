@@ -33,6 +33,8 @@ export type ExtractResult = {
   coverage: number
   /** 0..1, how clearly periodic the motion is. */
   confidence: number
+  /** Start and end of each detected rep, in source-video seconds (empty for holds). */
+  repTimes: [number, number][]
 }
 
 /** A problem with the clip itself; `message` is written for the user. */
@@ -185,8 +187,10 @@ export function extractAnimation(clip: TrackedClip, id: string): ExtractResult {
   loop.push({ t: 1, pose: clonePose(loop[0].pose) })
   fitToFrame(loop)
 
+  const t0 = found[0].t
   return {
     animation: { id, view, defaultTempoSec: round(secPerRep, 2), loop },
+    repTimes: kind === 'reps' ? cycles.map(([a, b]) => [round(t0 + a / FPS, 3), round(t0 + b / FPS, 3)]) : [],
     kind,
     repsFound: kind === 'reps' ? cycles.length : 0,
     secPerRep: round(secPerRep, 2),
@@ -393,8 +397,9 @@ export function findPeriod(s: number[], fps: number): { lag: number; score: numb
   if (peaks.length === 0) return null
   const best = Math.max(...peaks.map((l) => acf[l]))
   if (best < 0.3) return null
-  // The first strong peak, not a multiple of the period.
-  const lag = peaks.find((l) => acf[l] >= 0.8 * best)!
+  // The first strong peak, not a multiple of the period. Uneven reps blur the
+  // first peak, so accept one that's at least 65% as strong as the best.
+  const lag = peaks.find((l) => acf[l] >= 0.65 * best)!
   // Parabolic refinement for sub-frame accuracy.
   const [a, b, c] = [acf[lag - 1], acf[lag], acf[lag + 1]]
   const den = a - 2 * b + c

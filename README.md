@@ -67,26 +67,61 @@ On the overview, press **Make a workout from video**.
    - The first run downloads the ~9 MB pose model from Google; after that it's cached.
 3. **Check the moves.** There's one card per movement, in video order. Each card has:
    - **▶ 0:13–0:22**, which plays that part of your video.
-   - A preview loop of the extracted rep.
-   - What was detected: sets, reps per set, seconds per rep, and the view.
+   - A **confidence** rating (high/medium/low). Low ones get a **Check this one** tag and say why.
+   - A preview loop of the extracted rep, and what was detected: sets, reps per set, seconds per rep, and the view.
 
-   Name each movement, adjust Reps/Timed, sets, reps and rest, and optionally add form cues. Untick any you don't want, then **Add to workout**.
+   On each card you can:
+   - Name the movement, adjust Reps/Timed, sets, reps and rest, and optionally add form cues.
+   - Fix the **start / end** if they're off. **Update range** re-analyses just that range.
+   - **Delete** anything that isn't an exercise.
+   - **Add a movement that was missed**, from a range you enter.
+   - Use **Add other side (reverse)**. It's highlighted on moves that work one side (lunges, single-leg or single-arm work, side planks) when the video doesn't already show both sides.
+     - It adds a copy right after the original, named "(Left)" / "(Right)", or flipped if the name already says a side.
+     - The copy's **Mirror** toggle (off by default) flips the stick figure, and the video when you watch it here, so it looks like the other side. On-screen text in the video appears backwards when mirrored.
+     - **Remove this copy** deletes it in one click.
+
+   Then press **Add to workout**.
 4. Add more clips if you like. In the workout list, **▶** plays one movement on its own. **Start workout** plays them all in order in the hands-free player, with the badge reading "From your videos". Form cues show under the counter while you do that exercise.
 
-**How a video is split into movements** (`src/extract/segment.ts`, pure and unit-tested):
-- **Describe each moment:** each frame's posture is measured relative to the hips, in spine lengths. Turning around doesn't count as a change.
+**How a video is split into movements** (`src/extract/segment.ts`, pure and unit-tested). It runs in two passes, and nothing is sent anywhere.
+
+*Pass 1, candidates:*
+- **Describe each moment:** each frame's posture is measured relative to the hips, in spine lengths.
+  - Turning around doesn't count as a change.
+  - Whole-body bounce is included, which catches calf raises and jumps.
+  - In clear side views, it also records which leg and arm are forward, so a left-leg and a right-leg lunge differ.
 - **Breaks:** the video is cut wherever nobody is tracked for 0.7 s or more (a title card, a cut away), and at camera cuts (the body jumps in the frame and changes size).
 - **Changes of exercise:** at every quarter second, PACT compares the 3 s before with the 3 s after: the average posture, and how much each body part moves. A big difference marks a new movement, and the exact moment is then pinned down with 1 s windows. Back-to-back movements with no break are split this way.
 - **Labelling the pieces:**
   - **Transition:** shorter than 2 s, like getting down to the floor. It's absorbed into the movement before it if it looks like that move, otherwise dropped.
-  - **Rest:** standing still and upright.
-  - **Hold:** still but not upright (plank).
+  - **Rest:** still while standing, kneeling, sitting or lying on the mat. These are never holds.
+  - **Hold:** still in an exercise position for at least 5 s. It gets high confidence if held up on the arms (plank, side plank), low confidence otherwise.
   - Anything else is a **movement**.
 - **Merging:** neighbouring pieces that look like the same movement are merged into one entry.
   - If a rest or a break separates them, they become **separate sets** of that entry.
   - The same movement coming back after a *different* movement stays a **separate entry**.
 - **Extraction:** each set is extracted with the single-movement step below. The loop comes from the best-tracked set, and reps are counted per set.
+
+*Pass 2, verification:*
+- **Extend:** while the same motion continues right next to a movement, the movement grows into it, so fragments get their full range.
+- **Trim:** still edges are removed, so a movement doesn't start while you're still lying on the mat. A range is then trimmed to its first and last rep, allowing one rep of slack for partial reps.
+- **Gap check:** any uncovered stretch over 3 s that isn't a rest, and isn't empty (nobody in frame), gets a second look. Anything found there is marked low confidence.
+- **No rhythm:** moving with no steady rhythm becomes an "unclear" movement (low confidence) if it lasts 4 s or more, and is dropped as a transition if shorter. It's never called a hold.
+- **Merge:** neighbouring fragments of the same movement are merged.
+- **Clamp:** timestamps are clamped to the video, and ranges never overlap.
+- **Confidence:** each movement is rated high/medium/low, with plain reasons: irregular reps, few reps, the body lost in frames, found on a second look.
+- **One-sided:** a movement is one-sided when left and right limbs sit in clearly different places. If the same move follows with the sides swapped, both are marked as "both sides shown", labelled Left/Right, and the button isn't suggested.
 - **Nothing found:** if there's no clear movement at all, you get a friendly message instead of an error.
+
+**Debug file.** After analysing, **Download debug file** saves everything behind the result:
+- the video's name and length, and the analysed range;
+- the sampling (15 frames per second) and every frame's timestamp;
+- each piece with its label and why;
+- every decision in plain words;
+- the final movement list;
+- the raw body tracking.
+
+In dev builds (`npm run dev`), **Load a debug file instead** re-runs the splitting on a saved file without the video, which is how a problem video can be reproduced and fixed.
 
 **How one movement is extracted** (`src/extract/extract.ts`, pure and unit-tested):
 - **Map:** MediaPipe's 33 landmarks become our 14 joints. The head is the midpoint of the ears; the neck is the midpoint of the shoulders.
@@ -103,7 +138,10 @@ On the overview, press **Make a workout from video**.
 **Known limits:**
 - Side views of arms are the weak spot. The tracker has to guess the hidden arm and can mislocate the visible one when it crosses the face or body. Check the preview, and if an arm looks wrong, try trimming to a cleaner section or a clip with better lighting.
 - Analysis speed depends on the device: a few seconds per 10 s of video with a decent graphics card, much slower without one.
-- Splitting is based on how the body moves only. Title cards and the instructor naming the next move aren't read; that needs the later AI step.
+- Splitting is based on how the body moves only. Speech, captions, title cards and the instructor naming the next move aren't read; that needs the later AI step. For the same reason, movement names are typed in by you.
+- "Left/Right" for a generated other side comes from the name, not from the video. Which leg the person actually used can't be told reliably from body tracking alone, so check the label.
+- One-sided detection compares where the left and right limbs sit. Single-arm moves filmed exactly side-on can be missed, because the hidden arm is drawn behind the visible one.
+- A glute-bridge-style hold (still, hips up, arms not holding the body up) is rated low confidence rather than high.
 - Two different exercises that look very alike from the camera's angle (e.g. a squat and a sumo squat) may be kept as one movement. The same exercise filmed from a very different angle may be split into two.
 - Movements shorter than 2 seconds are treated as transitions.
 - In dev builds, the raw tracking of the last analysed clip is available in the browser console as `window.__pactClip`, for debugging.
@@ -168,6 +206,9 @@ type Exercise = {
   tempoSec?: number;             // seconds per rep, rep_based only (override of animation default)
   clip?: { startSec: number; endSec: number };  // made from video: where this movement is in the source video
   notes?: string;                // form cues, shown under the counter during the exercise
+  side?: 'none' | 'left' | 'right' | 'both';  // which side works, for one-sided moves
+  mirroredFrom?: string;         // id of the exercise this is the generated other side of
+  mirrorFigure?: boolean;        // show the stick figure mirrored (the other side)
 };
 ```
 

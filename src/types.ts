@@ -18,6 +18,9 @@ export type Exercise = {
   tempoSec?: number // seconds per rep, rep_based only (override of animation default)
   clip?: { startSec: number; endSec: number } // where this movement appears in the source video
   notes?: string // form cues or other notes, shown while doing the exercise
+  side?: 'none' | 'left' | 'right' | 'both' // which side of the body works (one-sided moves)
+  mirroredFrom?: string // id of the exercise this is the generated other side of
+  mirrorFigure?: boolean // the stick figure is shown mirrored (so it looks like the other side)
 }
 
 export type Joint =

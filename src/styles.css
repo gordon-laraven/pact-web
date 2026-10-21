@@ -816,14 +816,11 @@ a.badge:hover {
   background: color-mix(in oklab, var(--surface), black 18%);
 }
 
-.movement-card.is-excluded {
-  opacity: 0.55;
-}
-
 .movement-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 6px 10px;
 }
 
 .movement-index {
@@ -832,15 +829,9 @@ a.badge:hover {
 }
 
 .movement-time {
-  margin-left: auto;
   font-variant-numeric: tabular-nums;
-}
-
-.include input {
-  width: 22px;
-  height: 22px;
-  accent-color: var(--accent);
-  cursor: pointer;
+  color: var(--accent-tint);
+  font-weight: 600;
 }
 
 .sr-only {
@@ -892,4 +883,158 @@ a.badge:hover {
 
 .stage-work .panel-sub {
   color: var(--accent-tint);
+}
+
+/* Verification: confidence, editing, other side */
+
+.step-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.debug-load {
+  align-self: flex-start;
+  font-size: 14px;
+}
+
+.confidence {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.confidence-high {
+  color: var(--accent-tint);
+}
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.movement-head .tag {
+  margin-left: 0;
+}
+
+.tag-check {
+  background: rgba(240, 180, 60, 0.18);
+  color: #f3cf86;
+}
+
+.movement-card.is-low {
+  border-color: rgba(240, 180, 60, 0.45);
+}
+
+.reasons {
+  margin: -6px 0 0;
+  color: #f3cf86;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.range-edit {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: end;
+}
+
+.range-edit .secondary-button {
+  grid-column: 1 / -1;
+}
+
+.range-edit label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.range-edit .secondary-button {
+  min-height: 44px;
+  font-size: 15px;
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.card-actions .secondary-button {
+  width: auto;
+  min-height: 46px;
+  padding: 0 16px;
+  font-size: 15px;
+}
+
+.secondary-button.is-suggested {
+  background: color-mix(in oklab, var(--accent), transparent 70%);
+  border-color: var(--accent-tint);
+  color: var(--text);
+}
+
+.text-btn.danger {
+  color: #f2a99c;
+}
+
+.mirror-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.mirror-row .step-hint {
+  margin: 0;
+  font-size: 13px;
+}
+
+.check-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.check-label input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+.manual-add {
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.manual-add summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--accent-tint);
+}
+
+.manual-add[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }

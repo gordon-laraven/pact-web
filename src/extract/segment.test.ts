@@ -5,7 +5,7 @@ import type { Pose } from '../types'
 import { JOINTS } from '../types'
 import { ExtractError } from './extract'
 import { extractMovements, extractRange, sidedness, type DebugLog, type Movement } from './segment'
-import { calfRaisePose, emptyPart, irregularPhase, kneelPose, lungePose, sitPose, spliceClips } from './testClips'
+import { calfRaisePose, emptyPart, irregularPhase, kneelPose, lungePose, sitPose, spliceClips, squatComboPose } from './testClips'
 
 const A = (id: string) => getAnimation(id)
 const stand = samplePose(A('squat'), 0)
@@ -56,8 +56,9 @@ describe('extractMovements', () => {
       [66.5, 74.5],
     ]
     ms.forEach((m, i) => {
-      expect(near(m.start, truth[i][0], 1)).toBe(true)
-      expect(near(m.end, truth[i][1], 1.6)).toBe(true) // a transition can attach to the end
+      // A short transition (getting down to the floor) can attach to either neighbour.
+      expect(near(m.start, truth[i][0], 1.6), `start ${m.start}`).toBe(true)
+      expect(near(m.end, truth[i][1], 1.6), `end ${m.end}`).toBe(true)
     })
     expect(near(ms[0].sets[0].end, 10)).toBe(true)
     expect(near(ms[0].sets[1].start, 14)).toBe(true)
@@ -258,5 +259,29 @@ describe('timestamps and manual ranges', () => {
     expect(m.result.view).toBe('side')
     expect(m.result.secPerRep).toBeCloseTo(2.4, 0)
     expect(extractRange(spliceClips([emptyPart(5)]), 0, 5, 'none')).toBeNull()
+  })
+})
+
+describe('look-alike combo moves back to back (the plate-workout case)', () => {
+  // Same legs, different arm work, different rhythm, no break between them:
+  // each has a steady rhythm of its own; joined, they don't.
+  const combo = (arms: 'front-raise' | 'press', tempo: number, seconds: number) => ({
+    anim: A('squat'),
+    seconds,
+    opts: { poseAt: (t: number) => squatComboPose(t / tempo, arms) },
+  })
+
+  it('keeps them as separate movements with their own tempos', () => {
+    const out = extractMovements(spliceClips([combo('front-raise', 2.2, 11), combo('press', 3.2, 13)]), 'c')
+    expect(out).toHaveLength(2)
+    expect(near(out[0].end, 11, 1.2) && near(out[1].start, 11, 1.2)).toBe(true)
+    expect(Math.abs(out[0].result.secPerRep - 2.2) / 2.2).toBeLessThan(0.1)
+    expect(Math.abs(out[1].result.secPerRep - 3.2) / 3.2).toBeLessThan(0.1)
+    expect(out.every((m) => m.confidence !== 'low')).toBe(true)
+  })
+
+  it('still keeps one long set of a single combo move together', () => {
+    const out = extractMovements(spliceClips([combo('press', 3.2, 26)]), 'c')
+    expect(shape(out)).toEqual(['side reps x1'])
   })
 })

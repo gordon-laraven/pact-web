@@ -73,17 +73,23 @@ const GAP_SEC = 0.7 // nobody tracked for this long = a break (title card, cut a
 const WINDOW_SEC = 3 // compare this much before vs after each moment
 const HOP_SEC = 0.25
 const REFINE_SEC = 1 // search +-1 s around each change, with 1 s windows, for the exact moment
-const CHANGE_THRESHOLD = 1.0 // how different before/after must be to start a new piece
+const CHANGE_THRESHOLD = 0.75 // how different before/after must be to start a new piece (over-split; merging undoes false splits)
 const MIN_SPLIT_GAP_SEC = 2 // two splits at least this far apart
 const MIN_MOVE_SEC = 2 // shorter pieces are transitions (getting down to the floor, etc.)
 const HOLD_MIN_SEC = 5 // a hold must be visibly still for at least this long
-const SAME_MOVE_THRESHOLD = 0.45 // neighbouring pieces closer than this are one movement
+const SAME_MOVE_THRESHOLD = 0.45 // neighbouring pieces closer than this can be one movement...
+const SAME_MOVE_LOOSE = 0.9 // ...or up to this, if joining them gives a clearly steadier rhythm
+const RHYTHM_GOOD = 0.5 // a part with at least this rhythm score has a clear rhythm of its own
+const RHYTHM_DROP = 0.25 // joining two parts that loses this much rhythm means two different movements
+const RHYTHM_MIN_SEC = 4 // a rhythm score over less time than this isn't trustworthy
 const EXTEND_THRESHOLD = 0.6 // keep extending a movement while its neighbour looks this similar
 const EXTEND_WINDOW_SEC = 1.5
 const STILL = 0.05 // average spread of posture below this = not moving
 const NEW_SET_GAP_SEC = 1.5 // nobody in frame this long between pieces of the same move = a new set
 const GAP_CHECK_SEC = 3 // uncovered stretches longer than this get a second look
 const UNCLEAR_MIN_SEC = 4 // moving with no rhythm for less than this = a transition, not a movement
+const LEFTOVER_MAX_SEC = 5 // leftovers up to this long can be folded into the movement next to them
+const BOUNDARY_SEARCH_SEC = 2 // how far a boundary between two movements may move to fit their rhythms
 const EDGE_TRIM_SEC = 0.25 // ignore the very edges of a piece (half a transition)
 
 type Frame = { t: number; joints: number[] | null; nose?: { x: number; y: number }; vis?: { lArm: number; rArm: number; lLeg: number; rLeg: number } }
@@ -280,6 +286,19 @@ function cutIntoPieces(clip: TrackedClip): { pieces: Labelled[]; feats: Feature[
   return { pieces, feats: rs.flatMap((r) => r.feats) }
 }
 
+/** The change detector's score over time: before-vs-after difference at each moment (for debugging). */
+export function changeCurve(clip: TrackedClip): { t: number; d: number }[] {
+  const { feats } = cutIntoPieces(clip)
+  const out: { t: number; d: number }[] = []
+  const window = (a: number, b: number) => feats.filter((x) => x.t >= a && x.t < b)
+  for (let t = (feats[0]?.t ?? 0) + WINDOW_SEC; t <= (feats[feats.length - 1]?.t ?? 0) - WINDOW_SEC; t += HOP_SEC) {
+    const before = window(t - WINDOW_SEC, t)
+    const after = window(t, t + WINDOW_SEC)
+    if (before.length >= 5 && after.length >= 5) out.push({ t, d: distance(describe(before), describe(after)) })
+  }
+  return out
+}
+
 /** The pieces a clip is cut into, with their labels (for tests and debugging). */
 export function pieceSummary(clip: TrackedClip) {
   let prev: number[] | null = null
@@ -306,13 +325,48 @@ export function extractMovements(clip: TrackedClip, idPrefix: string, opts: Extr
   const { pieces, feats } = cutIntoPieces(clip)
   for (const p of pieces) log?.pieces.push({ start: p.start, end: p.end, kind: p.kind, why: p.why, motion: motion(p.feats) })
 
+  // Rhythm of a stretch: how clearly it repeats (0 = no rhythm). Two different
+  // movements joined together lose the steady rhythm each has on its own.
+  const rhythmCache = new Map<string, number>()
+  const rhythm = (a: number, b: number) => {
+    if (b - a < RHYTHM_MIN_SEC) return 0
+    const key = `${a.toFixed(2)}-${b.toFixed(2)}`
+    if (!rhythmCache.has(key)) {
+      const r = tryExtract(clip, a, b, 'rhythm')
+      rhythmCache.set(key, r?.kind === 'reps' ? r.confidence : 0)
+    }
+    return rhythmCache.get(key)!
+  }
+  /** A short stretch is a real movement only if it shows 2.5+ clean repetitions (a burst of jacks). */
+  const clearShortBurst = (a: number, b: number) => {
+    const r = tryExtract(clip, a, b, 'burst')
+    return !!r && r.kind === 'reps' && r.confidence >= 0.7 && (b - a) / r.secPerRep >= 2.5
+  }
+  /** Same movement continuing? Looks alike, and joining keeps (or improves) the rhythm. */
+  const sameMovement = (a: { start: number; end: number; desc: number[] }, b: { start: number; end: number; desc: number[] }) => {
+    const d = distance(a.desc, b.desc)
+    if (d >= SAME_MOVE_LOOSE) return { same: false, why: 'looks different' }
+    const ra = rhythm(a.start, a.end)
+    const rb = rhythm(b.start, b.end)
+    const joined = rhythm(a.start, b.end)
+    if (ra >= RHYTHM_GOOD && rb >= RHYTHM_GOOD && joined < Math.min(ra, rb) - RHYTHM_DROP) {
+      return { same: false, why: `looks alike, but each has its own rhythm (${ra.toFixed(2)}, ${rb.toFixed(2)}) and together they don't (${joined.toFixed(2)})` }
+    }
+    if (d < SAME_MOVE_THRESHOLD) return { same: true, why: 'looks the same' }
+    // A slow rep cut in half has no rhythm in either half; joined, it repeats.
+    if (joined >= RHYTHM_GOOD && joined >= Math.max(ra, rb) - 0.1) return { same: true, why: `together they repeat steadily (${joined.toFixed(2)})` }
+    return { same: false, why: 'looks different' }
+  }
+
   // ---- Pass 1: group pieces into candidate movements ----
   const groups: Group[] = []
+  const leftovers: { start: number; end: number }[] = [] // time that isn't (yet) part of any movement
   let paused = false // a rest or a break since the last movement piece
   for (const p of pieces) {
     const prev = groups[groups.length - 1]
     const pause = paused || p.gapBefore >= NEW_SET_GAP_SEC
     const similar = prev && distance(prev.desc, p.desc) < SAME_MOVE_THRESHOLD
+    const lastSet = prev?.sets[prev.sets.length - 1]
     if (p.kind === 'rest') {
       paused = true
       note(`${t(p.start)}–${t(p.end)}: rest (${p.why})`)
@@ -324,53 +378,170 @@ export function extractMovements(clip: TrackedClip, idPrefix: string, opts: Extr
         prev.sets[prev.sets.length - 1].end = p.end
         prev.feats.push(...p.feats)
         note(`${t(p.start)}–${t(p.end)}: transition, absorbed into the movement before it`)
-      } else note(`${t(p.start)}–${t(p.end)}: transition, not part of a movement (${p.why})`)
+      } else {
+        note(`${t(p.start)}–${t(p.end)}: transition, not part of a movement yet (${p.why})`)
+        if (!pause) leftovers.push({ start: p.start, end: p.end })
+      }
       continue
     }
-    if (similar && prev.kind === p.kind) {
+    const verdict =
+      prev && prev.kind === p.kind
+        ? p.kind === 'hold' || pause
+          ? { same: !!similar, why: similar ? 'looks the same' : 'looks different' }
+          : sameMovement({ start: lastSet!.start, end: lastSet!.end, desc: prev.desc }, p)
+        : null
+    if (prev && verdict?.same) {
       if (pause) prev.sets.push({ start: p.start, end: p.end })
       else prev.sets[prev.sets.length - 1].end = p.end
       prev.feats.push(...p.feats)
       prev.desc = describe(prev.feats)
-      note(`${t(p.start)}–${t(p.end)}: same movement as before, ${pause ? 'new set (after a rest or break)' : 'same set'}`)
+      note(`${t(p.start)}–${t(p.end)}: same movement as before (${verdict.why}), ${pause ? 'new set (after a rest or break)' : 'same set'}`)
     } else {
       groups.push({ sets: [{ start: p.start, end: p.end }], desc: p.desc, kind: p.kind as 'move' | 'hold', feats: [...p.feats] })
-      note(`${t(p.start)}–${t(p.end)}: new ${p.kind === 'hold' ? 'hold' : 'movement'} candidate (${p.why})`)
+      note(`${t(p.start)}–${t(p.end)}: new ${p.kind === 'hold' ? 'hold' : 'movement'} candidate (${p.why})${verdict ? `; not joined to the one before: ${verdict.why}` : ''}`)
     }
     paused = false
   }
 
-  // ---- Pass 2a: extend each movement through neighbouring stretches of the same motion ----
+  // ---- Pass 2a: drop candidates that aren't exercises, before anything else grows into their time ----
+  for (let i = groups.length - 1; i >= 0; i--) {
+    const g = groups[i]
+    if (g.kind !== 'move') continue
+    const where = `${t(g.sets[0].start)}–${t(g.sets[g.sets.length - 1].end)}`
+    if (g.sets.some((s) => rhythm(s.start, s.end) > 0 || clearShortBurst(s.start, s.end))) continue
+    const length = g.sets.reduce((n, s) => n + (s.end - s.start), 0)
+    if (restPosition(g.feats) === 'standing') {
+      note(`${where}: not a movement on its own: standing and moving without any repeating rhythm`)
+      groups.splice(i, 1)
+      leftovers.push(...g.sets)
+    } else if (length < UNCLEAR_MIN_SEC) {
+      note(`${where}: not a movement on its own: only ${length.toFixed(1)} s of movement with no rhythm`)
+      groups.splice(i, 1)
+      leftovers.push(...g.sets)
+    }
+  }
+
+  // ---- Pass 2a': a short leftover next to a movement is often its first or last rep ----
+  // Between two movements it usually holds the end of one and the start of the
+  // next, so split it where both neighbours keep their steadiest rhythm.
+  const moveSets = () => groups.filter((g) => g.kind === 'move').flatMap((g) => g.sets)
+  const joinedLeftovers: { start: number; end: number }[] = []
+  for (const lo of leftovers.sort((a, b) => a.start - b.start)) {
+    const last = joinedLeftovers[joinedLeftovers.length - 1]
+    if (last && lo.start - last.end < 0.3) last.end = Math.max(last.end, lo.end)
+    else joinedLeftovers.push({ ...lo })
+  }
+  for (const lo of joinedLeftovers) {
+    if (lo.end - lo.start > LEFTOVER_MAX_SEC) {
+      note(`${t(lo.start)}–${t(lo.end)}: dropped (walking about, adjusting, or a transition)`)
+      continue
+    }
+    const before = moveSets().find((st) => Math.abs(lo.start - st.end) < 0.6)
+    const after = moveSets().find((st) => Math.abs(st.start - lo.end) < 0.6)
+    if (!before && !after) {
+      note(`${t(lo.start)}–${t(lo.end)}: dropped (walking about, adjusting, or a transition)`)
+      continue
+    }
+    // Split it where both neighbours keep their steadiest rhythm. The whole
+    // leftover is shared out: better to include a second of transition than to
+    // cut off someone's first or last rep.
+    let best: { cut: number; score: number } | null = null
+    for (let cut = lo.start; cut <= lo.end + 1e-6; cut += HOP_SEC) {
+      const a = before ? rhythm(before.start, cut) : 0
+      const b = after ? rhythm(cut, after.end) : 0
+      const okA = !before || cut === lo.start || a >= Math.max(RHYTHM_GOOD, rhythm(before.start, before.end) - 0.3)
+      const okB = !after || cut >= lo.end - 1e-6 || b >= Math.max(RHYTHM_GOOD, rhythm(after.start, after.end) - 0.3)
+      if (!okA || !okB) continue
+      if (!best || a + b > best.score + 1e-9) best = { cut, score: a + b }
+    }
+    if (!best) {
+      note(`${t(lo.start)}–${t(lo.end)}: not part of either neighbour (it would break their rhythm)`)
+      continue
+    }
+    if (before && best.cut > lo.start) before.end = best.cut
+    if (after && best.cut < lo.end) after.start = best.cut
+    note(`${t(lo.start)}–${t(lo.end)}: leftover shared out at ${t(best.cut)} between the movements before and after (keeping their rhythm)`)
+  }
+
+  // ---- Pass 2a'': where two movements meet directly, put the boundary where both repeat most steadily ----
+  {
+    const sets = moveSets().sort((a, b) => a.start - b.start)
+    for (let i = 0; i + 1 < sets.length; i++) {
+      const a = sets[i]
+      const b = sets[i + 1]
+      if (b.start - a.end > 0.6) continue
+      const current = (a.end + b.start) / 2
+      const score = (cut: number) => rhythm(a.start, cut) + rhythm(cut, b.end)
+      const here = score(current)
+      const tried: { cut: number; score: number }[] = []
+      for (let cut = current - BOUNDARY_SEARCH_SEC; cut <= current + BOUNDARY_SEARCH_SEC + 1e-6; cut += HOP_SEC) {
+        if (cut - a.start < RHYTHM_MIN_SEC || b.end - cut < RHYTHM_MIN_SEC) continue
+        tried.push({ cut, score: score(cut) })
+      }
+      const top = Math.max(here, ...tried.map((x) => x.score))
+      // Rhythm scores level off near their best, so of the near-best cuts take
+      // the one closest to where the change detector put it.
+      const best = tried
+        .filter((x) => x.score >= top - 0.03)
+        .sort((x, y) => Math.abs(x.cut - current) - Math.abs(y.cut - current))[0] ?? { cut: current, score: here }
+      if (best.score > here + 0.1 && Math.abs(best.cut - current) > 0.2) {
+        note(`${t(current)}: boundary moved to ${t(best.cut)}, where both movements repeat most steadily (${here.toFixed(2)} → ${best.score.toFixed(2)})`)
+        a.end = best.cut
+        b.start = best.cut
+      }
+    }
+  }
+
+  // ---- Pass 2b: extend each movement through neighbouring stretches of the same motion ----
   const restRanges = pieces.filter((p) => p.kind === 'rest').map((p) => [p.start, p.end] as const)
   const taken = () => [...groups.flatMap((g) => g.sets.map((s) => [s.start, s.end] as const)), ...restRanges]
-  for (const g of groups) {
+  for (const [gi, g] of groups.entries()) {
     if (g.kind !== 'move') continue
     const first = g.sets[0]
     const last = g.sets[g.sets.length - 1]
     const others = taken().filter(([a, b]) => b <= first.start - 1e-6 || a >= last.end + 1e-6)
     const before = Math.max(-Infinity, ...others.filter(([, b]) => b <= first.start).map(([, b]) => b))
     const after = Math.min(Infinity, ...others.filter(([a]) => a >= last.end).map(([a]) => a))
-    const similarAt = (a: number, b: number) => {
+    // Time between two movements goes to whichever neighbour it looks more like.
+    const similarAt = (a: number, b: number, neighbour?: Group) => {
       const w = feats.filter((x) => x.t >= a && x.t < b)
-      return w.length >= 5 && distance(describe(w), g.desc) < EXTEND_THRESHOLD
+      if (w.length < 5) return false
+      const d = describe(w)
+      const mine = distance(d, g.desc)
+      return mine < EXTEND_THRESHOLD && (!neighbour || mine <= distance(d, neighbour.desc))
     }
+    const prevGroup = groups[gi - 1]
+    const nextGroup = groups[gi + 1]
     const stillAt = (a: number, b: number) => {
       const w = feats.filter((x) => x.t >= a && x.t < b)
       return w.length >= 5 && motion(w) < STILL
     }
     const s0 = first.start
     const e0 = last.end
-    while (first.start - HOP_SEC > before && similarAt(first.start - EXTEND_WINDOW_SEC, first.start)) first.start -= HOP_SEC
-    while (last.end + HOP_SEC < after && similarAt(last.end, last.end + EXTEND_WINDOW_SEC)) last.end += HOP_SEC
-    // ...and don't start or end on a stretch of standing or lying still.
-    while (first.start + EXTEND_WINDOW_SEC < first.end && stillAt(first.start, first.start + EXTEND_WINDOW_SEC)) first.start += HOP_SEC
-    while (last.end - EXTEND_WINDOW_SEC > last.start && stillAt(last.end - EXTEND_WINDOW_SEC, last.end)) last.end -= HOP_SEC
+    while (first.start - HOP_SEC > before && similarAt(first.start - EXTEND_WINDOW_SEC, first.start, prevGroup)) first.start -= HOP_SEC
+    while (last.end + HOP_SEC < after && similarAt(last.end, last.end + EXTEND_WINDOW_SEC, nextGroup)) last.end += HOP_SEC
+    // ...and don't start or end on a stretch of standing or lying still (even
+    // if the edge itself catches the last moment of the move before).
+    for (let a = first.start; a <= first.start + 1 + 1e-6; a += HOP_SEC) {
+      if (!stillAt(a, a + EXTEND_WINDOW_SEC)) continue
+      let u = a
+      while (u + EXTEND_WINDOW_SEC < first.end && stillAt(u, u + EXTEND_WINDOW_SEC)) u += HOP_SEC
+      first.start = u
+      break
+    }
+    for (let b = last.end; b >= last.end - 1 - 1e-6; b -= HOP_SEC) {
+      if (!stillAt(b - EXTEND_WINDOW_SEC, b)) continue
+      let u = b
+      while (u - EXTEND_WINDOW_SEC > last.start && stillAt(u - EXTEND_WINDOW_SEC, u)) u -= HOP_SEC
+      last.end = u
+      break
+    }
     if (Math.abs(first.start - s0) > 1e-6 || Math.abs(last.end - e0) > 1e-6) {
       note(`${t(s0)}–${t(e0)}: range adjusted to ${t(first.start)}–${t(last.end)} (same motion continues next to it, or still at the edges)`)
     }
   }
 
-  // ---- Pass 2b: re-examine uncovered stretches for a missed movement ----
+  // ---- Pass 2c: re-examine uncovered stretches for a missed movement ----
   const tracked = feats.length ? [feats[0].t, feats[feats.length - 1].t] : [0, 0]
   const covered = taken().sort((a, b) => a[0] - b[0])
   let cursor = tracked[0]
@@ -390,12 +561,17 @@ export function extractMovements(clip: TrackedClip, idPrefix: string, opts: Extr
       note(`${t(a)}–${t(b)}: uncovered, body is still (${restPosition(w) ?? 'not a clear hold'}): not a movement`)
       continue
     }
+    const r = rhythm(w[0].t, w[w.length - 1].t)
+    if (r < RHYTHM_GOOD && (restPosition(w) === 'standing' || b - a < UNCLEAR_MIN_SEC)) {
+      note(`${t(a)}–${t(b)}: uncovered and moving, but nothing repeats there: not a movement`)
+      continue
+    }
     groups.push({ sets: [{ start: w[0].t, end: w[w.length - 1].t }], desc: describe(w), kind: 'move', feats: w, fromGapCheck: true })
-    note(`${t(a)}–${t(b)}: uncovered and moving, re-examined as a possible missed movement`)
+    note(`${t(a)}–${t(b)}: uncovered and moving, re-examined as a possible missed movement (rhythm ${r.toFixed(2)})`)
   }
   groups.sort((x, y) => x.sets[0].start - y.sets[0].start)
 
-  // ---- Pass 2c: extract each set, trim to first/last rep, rate confidence ----
+  // ---- Pass 2d: extract each set, trim to first/last rep, rate confidence ----
   type Built = Movement & { desc: number[]; groupKind: Group['kind']; feats: Feature[] }
   const built: Built[] = []
   for (const [gi, g] of groups.entries()) {
@@ -448,11 +624,11 @@ export function extractMovements(clip: TrackedClip, idPrefix: string, opts: Extr
     note(`${where}: kept as ${result.kind === 'reps' ? `${result.repsFound} reps at ${result.secPerRep} s` : 'a hold'}, confidence ${confidence}${reasons.length ? ` (${reasons.join('; ')})` : ''}`)
   }
 
-  // ---- Pass 2d: merge neighbouring fragments of one movement ----
+  // ---- Pass 2e: merge neighbouring fragments of one movement ----
   for (let i = 0; i + 1 < built.length; ) {
     const a = built[i]
     const b = built[i + 1]
-    if (a.groupKind === b.groupKind && a.kind === b.kind && distance(a.desc, b.desc) < SAME_MOVE_THRESHOLD) {
+    if (a.groupKind === b.groupKind && a.kind === b.kind && sameMovement(a, b).same) {
       const restBetween = restRanges.some(([s, e]) => s >= a.end - 1e-6 && e <= b.start + 1e-6)
       if (restBetween) a.sets.push(...b.sets)
       else a.sets[a.sets.length - 1] = { ...a.sets[a.sets.length - 1], end: b.sets[0].end, reps: a.sets[a.sets.length - 1].reps + b.sets[0].reps }
@@ -466,7 +642,7 @@ export function extractMovements(clip: TrackedClip, idPrefix: string, opts: Extr
     } else i++
   }
 
-  // ---- Pass 2e: clamp to the video and remove overlaps ----
+  // ---- Pass 2f: clamp to the video and remove overlaps ----
   const lo = clip.frames.length ? clip.frames[0].t : 0
   const hi = Math.min(clip.frames.length ? clip.frames[clip.frames.length - 1].t : 0, opts.videoDuration ?? Infinity)
   built.sort((a, b) => a.start - b.start)
@@ -601,14 +777,36 @@ function limbLayout(anim: Animation, swap = false): { x: number; y: number }[] {
 
 const hipOf = (p: Pose) => ({ x: (p.lHip.x + p.rHip.x) / 2, y: (p.lHip.y + p.rHip.y) / 2 })
 
-/** Left and right limbs sit in clearly different places (one leg forward, one arm working). */
+/**
+ * One side of the body does the work. From the side: left and right limbs sit
+ * in clearly different places (one leg forward). From the front, where a
+ * slight camera angle shifts left and right apart anyway: one leg or arm moves
+ * much more than the other.
+ */
 export function sidedness(anim: Animation): { oneSided: boolean; score: number } {
-  const layout = limbLayout(anim)
-  let score = 0
-  for (let i = 0; i < layout.length; i += 2) {
-    score = Math.max(score, Math.hypot(layout[i].x - layout[i + 1].x, layout[i].y - layout[i + 1].y))
+  if (anim.view === 'side') {
+    const layout = limbLayout(anim)
+    let score = 0
+    for (let i = 0; i < layout.length; i += 2) {
+      score = Math.max(score, Math.hypot(layout[i].x - layout[i + 1].x, layout[i].y - layout[i + 1].y))
+    }
+    return { oneSided: score > 0.5, score }
   }
-  return { oneSided: score > 0.5, score }
+  const spine = median(anim.loop.map(({ pose }) => Math.hypot(pose.neck.x - hipOf(pose).x, pose.neck.y - hipOf(pose).y)))
+  const travel = (j: Joint) => {
+    const pts = anim.loop.map(({ pose }) => ({ x: (pose[j].x - hipOf(pose).x) / spine, y: (pose[j].y - hipOf(pose).y) / spine }))
+    const mx = mean(pts.map((p) => p.x))
+    const my = mean(pts.map((p) => p.y))
+    return 2 * Math.sqrt(mean(pts.map((p) => (p.x - mx) ** 2 + (p.y - my) ** 2)))
+  }
+  let score = 0
+  for (const [l, r] of LIMB_PAIRS) {
+    const a = travel(l)
+    const b = travel(r)
+    if (Math.max(a, b) < 0.4) continue // neither moves much: says nothing
+    score = Math.max(score, 1 - Math.min(a, b) / Math.max(a, b))
+  }
+  return { oneSided: score > 0.45, score }
 }
 
 /** b is a's movement with left and right swapped (the other side). */

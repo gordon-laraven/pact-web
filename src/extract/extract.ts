@@ -382,7 +382,8 @@ export function findPeriod(s: number[], fps: number): { lag: number; score: numb
   const sorted = [...s].sort((a, b) => a - b)
   if (sorted[Math.floor(n * 0.95)] - sorted[Math.floor(n * 0.05)] < BODY.spine * 0.15) return null
   const minLag = Math.round(0.35 * fps)
-  const maxLag = Math.min(Math.round(10 * fps), Math.floor(n / 1.6))
+  // Need about 1.4 repetitions in view to see a rhythm (slow combo reps can be 4 s+).
+  const maxLag = Math.min(Math.round(10 * fps), Math.floor(n / 1.4))
   if (maxLag <= minLag + 2) return null
   const acf: number[] = []
   for (let lag = 0; lag <= maxLag; lag++) {

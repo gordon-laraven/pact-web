@@ -7,7 +7,9 @@ import { OVERLAY_BONES, trackVideo } from '../extract/mediapipe'
 import { extractMovements, extractRange, type DebugLog, type Movement } from '../extract/segment'
 import { formatClock, prescription } from '../player/format'
 import type { Exercise, Workout } from '../types'
+import type { TicketContext } from '../support/tickets'
 import { AnimationPreview } from './AnimationPreview'
+import { ReportProblem } from './ReportProblem'
 
 // "Make from video": pick a clip, track the body, split it into its movements,
 // extract one clean rep of each, and add them to a workout. Everything happens
@@ -26,7 +28,7 @@ type Status =
   | { kind: 'idle' }
   | { kind: 'analyzing'; progress: number }
   | { kind: 'done' }
-  | { kind: 'error'; message: string }
+  | { kind: 'error'; message: string; step: string; cause?: unknown }
 
 /** What was analysed, kept for re-analysing edited ranges and for the debug file. */
 type Analysis = {
@@ -88,6 +90,13 @@ function sideNames(name: string): { original: string; copy: string; originalSide
 }
 const swapWord = (s: string, re: RegExp, to: string) => s.replace(re, (m) => (m[0] === m[0].toLowerCase() ? to.toLowerCase() : to))
 
+/** A readable line for something thrown that isn't an Error (an Event, a string…). */
+const describe = (x: unknown): string => {
+  if (typeof x === 'string') return x
+  const o = x as { message?: unknown; type?: unknown; constructor?: { name?: string } } | null
+  if (o && typeof o.message === 'string') return o.message
+  return [o?.constructor?.name, typeof o?.type === 'string' ? o.type : null].filter(Boolean).join(' ') || String(x)
+}
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 const num = (e: ChangeEvent<HTMLInputElement>) => Number(e.target.value)
 const round1 = (x: number) => Math.round(x * 10) / 10
@@ -96,7 +105,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
   const video = useRef<HTMLVideoElement>(null)
   const overlay = useRef<HTMLCanvasElement>(null)
   const abort = useRef<AbortController | null>(null)
-  const [file, setFile] = useState<{ name: string; url: string } | null>(null)
+  const [file, setFile] = useState<{ name: string; url: string; size: number } | null>(null)
   const [duration, setDuration] = useState(0)
   const [range, setRange] = useState({ start: 0, end: 0 })
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
@@ -120,7 +129,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
     e.target.value = '' // allow picking the same file again
     if (!f) return
     abort.current?.abort()
-    setFile({ name: f.name, url: URL.createObjectURL(f) })
+    setFile({ name: f.name, url: URL.createObjectURL(f), size: f.size })
     reset()
   }
 
@@ -187,7 +196,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
     } catch (err) {
       if (!(err instanceof ExtractError)) throw err
       setItems([])
-      setStatus({ kind: 'error', message: err.message })
+      setStatus({ kind: 'error', message: err.message, step: 'Finding the moves', cause: err })
     }
   }
 
@@ -218,6 +227,8 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
       setStatus({
         kind: 'error',
         message: "Body tracking didn't start. It downloads once, on first use, so check your connection and try again.",
+        step: 'Following the movement (body tracking)',
+        cause: err,
       })
     }
   }
@@ -227,18 +238,36 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
     reset()
   }
 
-  /** Everything needed to see why the video was split the way it was. */
-  const downloadDebug = () => {
-    if (!analysis) return
-    const { clip, log, source } = analysis
-    const data = {
-      app: 'pact-web',
-      savedAt: new Date().toISOString(),
-      video: source,
-      sampling: { framesPerSecond: SAMPLE_FPS, frameCount: clip.frames.length, timestamps: clip.frames.map((f) => f.t) },
-      pieces: log.pieces,
-      decisions: log.decisions,
-      movements: items.map((it) => ({
+  /** What was detected so far, for a problem report. Never video frames or tracking. */
+  const detectionSoFar = () =>
+    analysis
+      ? {
+          range: analysis.source.range,
+          frameCount: analysis.clip.frames.length,
+          pieces: analysis.log.pieces,
+          decisions: analysis.log.decisions,
+          movements: movementSummary(),
+        }
+      : null
+
+  /** Everything a problem report needs about this moment. */
+  const ticketContext = (step: string, message?: string, cause?: unknown): TicketContext => {
+    const e = cause instanceof Error ? cause : null
+    const detail = e?.message ?? (cause === undefined ? undefined : describe(cause))
+    return {
+      step,
+      error: message || detail ? { message: [message, detail].filter(Boolean).join(' | '), stack: e?.stack } : undefined,
+      video: file
+        ? { name: file.name, sizeBytes: file.size, durationSec: duration ? round1(duration) : null }
+        : analysis
+          ? { name: analysis.source.name, sizeBytes: null, durationSec: round1(analysis.source.duration) }
+          : undefined,
+      detection: detectionSoFar(),
+    }
+  }
+
+  const movementSummary = () =>
+    items.map((it) => ({
         name: it.form.name,
         start: round1(it.movement.start),
         end: round1(it.movement.end),
@@ -253,7 +282,20 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
         side: it.side,
         copyOf: it.copyOf,
         addedByHand: it.addedByHand ?? false,
-      })),
+      }))
+
+  /** Dev only: everything needed to see why the video was split the way it was. */
+  const downloadDebug = () => {
+    if (!analysis) return
+    const { clip, log, source } = analysis
+    const data = {
+      app: 'pact-web',
+      savedAt: new Date().toISOString(),
+      video: source,
+      sampling: { framesPerSecond: SAMPLE_FPS, frameCount: clip.frames.length, timestamps: clip.frames.map((f) => f.t) },
+      pieces: log.pieces,
+      decisions: log.decisions,
+      movements: movementSummary(),
       tracking: clip,
     }
     const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }))
@@ -277,8 +319,8 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
       const start = clip.frames[0]?.t ?? 0
       const end = clip.frames[clip.frames.length - 1]?.t ?? 0
       runExtraction(clip, { name: data.video?.name ?? f.name, duration: data.video?.duration ?? end, range: { start, end }, fromDebugFile: true })
-    } catch {
-      setStatus({ kind: 'error', message: "That file isn't a PACT debug file." })
+    } catch (err) {
+      setStatus({ kind: 'error', message: "That file isn't a pact debug file.", step: 'Loading a debug file', cause: err })
     }
   }
 
@@ -502,7 +544,15 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
             )}
           </>
         )}
-        {status.kind === 'error' && <p className="builder-error">{status.message}</p>}
+        {status.kind === 'error' && (
+          <>
+            <p className="builder-error">{status.message}</p>
+            <ReportProblem
+              context={() => ticketContext(status.step, status.message, status.cause)}
+              onTryAgain={() => (file && duration ? void analyze() : reset())}
+            />
+          </>
+        )}
         {analysis?.source.fromDebugFile && <p className="step-hint">Loaded from a debug file: there's no video to watch.</p>}
       </section>
 
@@ -510,9 +560,11 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
         <section className="overview-card builder-step">
           <div className="step-head">
             <h2 className="step-title">2. Check the {items.length === 1 ? 'move' : `${items.length} moves`}</h2>
-            <button type="button" className="text-btn" onClick={downloadDebug}>
-              Download debug file
-            </button>
+            {import.meta.env.DEV && (
+              <button type="button" className="text-btn" onClick={downloadDebug}>
+                Download debug file (dev)
+              </button>
+            )}
           </div>
           {items.length > 0 && (
             <p className="step-hint">
@@ -532,6 +584,10 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
                 onForm={(form) => update(it.key, { form })}
                 onWatch={() => watch(it)}
                 onRange={(s, e) => setRangeFor(it.key, s, e)}
+                reportContext={() =>
+                  ticketContext(`Updating the range of move ${i + 1}`, `${it.rangeError ?? ''} (move ${round1(it.movement.start)}–${round1(it.movement.end)} s)`)
+                }
+                onDismissError={() => update(it.key, { rangeError: undefined })}
                 onDelete={() => removeItem(it.key)}
                 onOtherSide={() => addOtherSide(it.key)}
                 onMirror={(mirror) => update(it.key, { mirror })}
@@ -555,8 +611,26 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
             <button type="button" className="secondary-button" onClick={addManual}>
               Add this range as a movement
             </button>
-            {manual.error && <p className="builder-error">{manual.error}</p>}
+            {manual.error && (
+              <>
+                <p className="builder-error">{manual.error}</p>
+                <ReportProblem
+                  compact
+                  context={() => ticketContext('Adding a missed movement', `${manual.error} (range ${manual.start}–${manual.end} s)`)}
+                  onTryAgain={() => setManual({ ...manual, error: '' })}
+                />
+              </>
+            )}
           </details>
+
+          <div className="report-inline">
+            <p className="step-hint">Something look off in these results?</p>
+            <ReportProblem
+              compact
+              context={() => ticketContext('Checking the moves')}
+              onTryAgain={() => (file && duration ? void analyze() : undefined)}
+            />
+          </div>
 
           <button type="button" className="start-button" onClick={add} disabled={items.length === 0}>
             {items.length === 1 ? 'Add to workout' : `Add ${items.length} movements to workout`}
@@ -629,6 +703,8 @@ type CardProps = {
   onForm: (form: Form) => void
   onWatch: () => void
   onRange: (start: number, end: number) => void
+  reportContext: () => TicketContext
+  onDismissError: () => void
   onDelete: () => void
   onOtherSide: () => void
   onMirror: (mirror: boolean) => void
@@ -718,7 +794,12 @@ function MovementCard(p: CardProps) {
             </button>
           </div>
         )}
-        {it.rangeError && <p className="builder-error span-2">{it.rangeError}</p>}
+        {it.rangeError && (
+          <div className="span-2 card-error">
+            <p className="builder-error">{it.rangeError}</p>
+            <ReportProblem compact context={p.reportContext} onTryAgain={p.onDismissError} />
+          </div>
+        )}
         <div className="span-2 segmented" role="radiogroup" aria-label="Exercise type">
           {(['rep_based', 'time_based'] as const).map((t) => (
             <button

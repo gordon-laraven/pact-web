@@ -785,6 +785,7 @@ a.badge:hover {
 .builder input[type='number'],
 .builder input[type='text'],
 .builder input[type='url'],
+.builder input[type='email'],
 .builder select,
 .builder textarea {
   width: 100%;
@@ -1280,3 +1281,66 @@ a.badge:hover {
   text-align: left;
   margin-top: -4px;
 }
+
+/* ---------- Report a problem ---------- */
+
+.report {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: var(--hairline) solid var(--line);
+  border-left: 2px solid var(--glow);
+  border-radius: 0 var(--radius-m) var(--radius-m) 0;
+  background: var(--surface);
+}
+
+.report .step-hint {
+  margin: 0;
+}
+
+.report .option-title {
+  margin: 0 0 4px;
+}
+
+.report-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.report-actions .primary-button {
+  width: auto;
+  padding: 0 22px;
+}
+
+.report-open.text-btn {
+  align-self: flex-start;
+  padding-left: 0;
+}
+
+.ticket-id {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.ticket-id code {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+.card-error,
+.report-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.report-inline .step-hint {
+  margin: 0;
+}
+

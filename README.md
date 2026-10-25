@@ -4,7 +4,7 @@
 
 This repo is a **frontend-only prototype** that tests one thing: **the hands-free feel**. You press Start once and follow a full workout, like putting in a P90X tape. A stick figure demonstrates each move. Reps, sets, rest timers and spoken cues advance on their own. You never touch the screen mid-workout.
 
-It can also **read a pasted link** (a YouTube Short, Instagram or Facebook reel, TikTok) to find which exercises are in it. See [Paste a link](#paste-a-link).
+There is also a **Paste a link** feature (read a post's caption to find its exercises). It is **switched off** for now and will return as a paid feature. See [Paste a link](#paste-a-link).
 
 It also has a first version of the core idea: **Make a workout from video.** Pick a clip on your device. pact tracks the body, splits the video into its separate movements, cuts one clean rep of each, and turns them into stick-figure moves for a hands-free workout. See [Make a workout from video](#make-a-workout-from-video).
 
@@ -62,6 +62,8 @@ If the speech API is missing or fails, the workout runs silently, with no errors
 
 ## Paste a link
 
+> **Currently off.** `ENABLE_LINK_IMPORT` in `src/features.ts` is `false`. While it's off, the home screen shows only **Upload a video**, the link screen never renders, and the dev/preview server doesn't mount `/api/link/*`, so no link requests happen. All the code and its tests are kept. They still run, because none of them need the UI. Set the flag to `true` to bring it back; nothing else needs to change.
+
 On the home screen, **Paste a link** takes a YouTube / Shorts, Instagram, Facebook or TikTok link and finds the exercises in it. **Nothing from the video is downloaded, stored or re-hosted.** Only the post's public title and caption are read, and the workout still plays with the stick figure. The original upload flow is unchanged and is one tap away from here.
 
 ### The pipeline
@@ -107,6 +109,20 @@ With no keys at all, links still work wherever the caption lists the moves clear
 ### Hosting
 
 `npm run dev` and `npm run preview` include the API (`server/vitePlugin.ts`). On a static host without it, link reading shows the fallback, and typed lists are parsed in the browser instead. To host it elsewhere, mount `createLinkApi(env)` from `server/link/api.ts`: it's a plain Node `(req, res, next)` middleware.
+
+## Report a problem
+
+When something goes wrong on the upload screen (body tracking doesn't start, no moves are found, a range can't be tracked), the error comes with a **Report a problem** button. On the "Check the moves" step, a quieter link asks "Something look off in these results?". This replaces the old "Download debug file" button, which now shows only in dev builds.
+
+The form asks what you were trying to do (optional), an email (optional), and has **Include technical details** (checked by default). A ticket records:
+- the time, app version, and step;
+- if technical details are included: browser and device, the error message and stack, the video's name, size and length, and what was detected so far (movements, pieces, decisions).
+
+The video itself and the raw body tracking are never included. After sending, you see a ticket ID to copy and **Try again**. If saving fails, the details appear as text with **Copy details**.
+
+**Where tickets go:** `src/support/tickets.ts`. Tickets are saved through one small interface, `TicketStore { save(ticket) }`. For now that's `localTicketStore()`, this browser's `localStorage` (key `pact-tickets`, latest 50). To send them somewhere else (email, a form service, a helpdesk), write another `TicketStore` and change the `ticketStore` line.
+
+**Reading tickets:** open the app, open the browser console (F12), and run `pactTickets.list()` to see them, or `pactTickets.download()` to save `pact-tickets.json`. Because they live in that browser, you only see tickets made on the same browser and device. Reports from other people need a real destination (above).
 
 ## Brand: where to change things
 
@@ -178,7 +194,7 @@ On the overview, press **Upload a video** (or pick it from the fallback after pa
   - From the front, it's one-sided when one leg or arm moves much more than the other. Positions aren't compared there, because a slight camera angle shifts left and right apart anyway. If the same move follows with the sides swapped, both are marked as "both sides shown", labelled Left/Right, and the button isn't suggested.
 - **Nothing found:** if there's no clear movement at all, you get a friendly message instead of an error.
 
-**Debug file.** After analysing, **Download debug file** saves everything behind the result:
+**Debug file (dev builds only).** After analysing, **Download debug file (dev)** saves everything behind the result:
 - the video's name and length, and the analysed range;
 - the sampling (15 frames per second) and every frame's timestamp;
 - each piece with its label and why;

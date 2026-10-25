@@ -9,7 +9,8 @@ type Props = {
   theme: Theme
   onTheme: (t: Theme) => void
   onStart: () => void
-  onPasteLink: () => void
+  /** Only passed when link import is on (see src/features.ts). */
+  onPasteLink?: () => void
   onMakeFromVideo: () => void
 }
 
@@ -58,18 +59,28 @@ export function Overview({ timeline, theme, onTheme, onStart, onPasteLink, onMak
       </div>
 
       <section className="other-ways" aria-labelledby="other-ways-title">
-        <h2 id="other-ways-title">Saw a workout you liked?</h2>
-        <p className="overview-hint">
-          Bring it here and do it anywhere.
-        </p>
-        <div className="other-ways-buttons">
-          <button type="button" className="secondary-button" onClick={onPasteLink}>
-            Paste a link
-          </button>
-          <button type="button" className="secondary-button" onClick={onMakeFromVideo}>
-            Upload a video
-          </button>
-        </div>
+        {onPasteLink ? (
+          <>
+            <h2 id="other-ways-title">Saw a workout you liked?</h2>
+            <p className="overview-hint">Bring it here and do it anywhere.</p>
+            <div className="other-ways-buttons">
+              <button type="button" className="secondary-button" onClick={onPasteLink}>
+                Paste a link
+              </button>
+              <button type="button" className="secondary-button" onClick={onMakeFromVideo}>
+                Upload a video
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h2 id="other-ways-title">Have a workout on video?</h2>
+            <p className="overview-hint">pact follows the moves and turns them into a steady, hands-free session. Your video stays on this device.</p>
+            <button type="button" className="secondary-button" onClick={onMakeFromVideo}>
+              Upload a video
+            </button>
+          </>
+        )}
       </section>
     </main>
   )

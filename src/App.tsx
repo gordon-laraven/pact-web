@@ -8,6 +8,7 @@ import { sampleWorkout } from './data/sampleWorkout'
 import { buildTimeline } from './engine/timeline'
 import { CuePlayer } from './player/audio'
 import { readSpeed } from './player/format'
+import { ENABLE_LINK_IMPORT } from './features'
 import { useTheme } from './theme/theme'
 import type { Workout } from './types'
 
@@ -52,7 +53,7 @@ export default function App() {
       />
     )
   }
-  if (screen === 'link') {
+  if (screen === 'link' && ENABLE_LINK_IMPORT) {
     return (
       <LinkBuilder
         draft={linkDraft}
@@ -69,7 +70,7 @@ export default function App() {
       theme={theme}
       onTheme={setTheme}
       onStart={() => play(sampleWorkout, 'overview')}
-      onPasteLink={() => setScreen('link')}
+      onPasteLink={ENABLE_LINK_IMPORT ? () => setScreen('link') : undefined}
       onMakeFromVideo={() => setScreen('builder')}
     />
   )

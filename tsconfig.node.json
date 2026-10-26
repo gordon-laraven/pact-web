@@ -14,5 +14,5 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
-  "include": ["vite.config.ts", "server"]
+  "include": ["vite.config.ts", "vitest.eval.config.ts", "server", "scripts/*.eval.ts"]
 }

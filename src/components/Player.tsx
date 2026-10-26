@@ -28,6 +28,7 @@ import {
   SoundOnIcon,
 } from './icons'
 import { ProgressBar, type ProgressBarHandle } from './ProgressBar'
+import { ProgressRing, type ProgressRingHandle } from './ProgressRing'
 import { StickFigure, type StickFigureHandle } from './StickFigure'
 
 /** Everything the HUD shows. Only re-rendered when one of these changes. */
@@ -39,10 +40,12 @@ type View = {
   big: string
   bigSuffix: string | null
   sub: string | null
+  /** During a set: what comes after it ("Squat, set 2"), for the Up next strip. */
+  upNext: string | null
 }
 
 function toView(st: PlayerState, playing: boolean, activeSec: number): View {
-  const base = { playing, setLabel: null, bigSuffix: null, sub: null }
+  const base = { playing, setLabel: null, bigSuffix: null, sub: null, upNext: null }
   if (st.finished || !st.phase) {
     return { ...base, kind: 'done', playing: false, title: 'Pact kept.', big: formatClock(activeSec) }
   }
@@ -57,7 +60,8 @@ function toView(st: PlayerState, playing: boolean, activeSec: number): View {
       const nextSet = n && n.setNumber > 1 ? `, set ${n.setNumber}` : ''
       return { ...base, kind: 'rest', title: 'Rest', big: countdown, sub: n ? `Up next: ${n.exercise.name}${nextSet}` : null }
     }
-    case 'work':
+    case 'work': {
+      const upNext = n ? `${n.exercise.name}${n.totalSets > 1 ? `, set ${n.setNumber}` : ''}` : null
       return st.targetReps != null
         ? {
             ...base,
@@ -67,8 +71,10 @@ function toView(st: PlayerState, playing: boolean, activeSec: number): View {
             big: String(st.repsDone),
             bigSuffix: `/ ${st.targetReps}`,
             sub: st.exercise!.notes ?? null,
+            upNext,
           }
-        : { ...base, kind: 'work', title: st.exercise!.name, setLabel, big: countdown, bigSuffix: 'sec', sub: st.exercise!.notes ?? null }
+        : { ...base, kind: 'work', title: st.exercise!.name, setLabel, big: countdown, bigSuffix: 'sec', sub: st.exercise!.notes ?? null, upNext }
+    }
   }
 }
 
@@ -79,7 +85,8 @@ const sameView = (a: View, b: View) =>
   a.setLabel === b.setLabel &&
   a.big === b.big &&
   a.bigSuffix === b.bigSuffix &&
-  a.sub === b.sub
+  a.sub === b.sub &&
+  a.upNext === b.upNext
 
 type Props = {
   timeline: Timeline
@@ -95,6 +102,7 @@ export function Player({ timeline, audio, speed, badge, onExit }: Props) {
   const root = useRef<HTMLDivElement>(null)
   const figure = useRef<StickFigureHandle>(null)
   const progress = useRef<ProgressBarHandle>(null)
+  const ring = useRef<ProgressRingHandle>(null)
   const clock = useMemo(() => new PlayerClock(timeline.duration, speed), [timeline, speed])
   const cues = useMemo(() => buildCues(timeline), [timeline])
   // One scale for every move in this workout, so the figure never changes size.
@@ -131,6 +139,7 @@ export function Player({ timeline, audio, speed, badge, onExit }: Props) {
       const st = getStateAt(timeline, elapsed)
       if (st.figure) figure.current?.draw(getAnimation(st.figure.animationId), st.figure.t, st.figure.mode)
       progress.current?.update(getSegmentFills(timeline, elapsed))
+      ring.current?.update(st.phase ? st.phaseElapsed / st.phase.duration : 1)
       const next = toView(st, clock.isPlaying, activeSec.current)
       setView((prev) => (sameView(prev, next) ? prev : next))
       raf = requestAnimationFrame(frame)
@@ -257,15 +266,33 @@ export function Player({ timeline, audio, speed, badge, onExit }: Props) {
         </header>
 
         <ProgressBar ref={progress} count={timeline.workout.exercises.length} />
+        <p className={`up-next${view.upNext ? '' : ' is-empty'}`} aria-hidden={!view.upNext}>
+          {view.upNext && (
+            <>
+              <span className="up-next-label">Up next</span>
+              <span className="up-next-name">{view.upNext}</span>
+            </>
+          )}
+        </p>
 
         {done ? (
           <section className="finish">
+            <svg className="finish-mark" viewBox="0 0 100 100" aria-hidden="true">
+              <circle className="finish-mark-ring" cx="50" cy="50" r="44" />
+              <path className="finish-mark-check" d="M33 51 L45 63 L68 39" />
+            </svg>
             <h2 className="finish-title">Pact kept.</h2>
             <p className="finish-note">You showed up. That's the whole point.</p>
-            <p className="finish-time">
-              <span className="finish-time-value">{view.big}</span>
-              <span className="finish-time-label">moved today</span>
-            </p>
+            <dl className="finish-summary">
+              <div>
+                <dt>Workout</dt>
+                <dd>{timeline.workout.title}</dd>
+              </div>
+              <div>
+                <dt>Moved today</dt>
+                <dd className="finish-time-value">{view.big}</dd>
+              </div>
+            </dl>
             <button type="button" className="restart-button" onClick={button(restart)}>
               <RestartIcon size={22} />
               Go again
@@ -279,20 +306,24 @@ export function Player({ timeline, audio, speed, badge, onExit }: Props) {
             </div>
 
             <section className="panel">
-              <div className="panel-text">
-                {view.kind === 'work' ? (
-                  <>
-                    <h2 className="panel-title">{view.title}</h2>
-                    <p className="panel-set">{view.setLabel ?? ' '}</p>
-                  </>
-                ) : (
-                  <p className="panel-kicker">{view.title}</p>
-                )}
-                <p className="panel-big" aria-label={`${view.big} ${view.bigSuffix ?? ''}`}>
-                  <span className="panel-big-value">{view.big}</span>
-                  {view.bigSuffix && <span className="panel-big-suffix">{view.bigSuffix}</span>}
-                </p>
-                <p className="panel-sub">{view.sub ?? ' '}</p>
+              <div className="panel-row">
+                <div className="panel-text">
+                  {view.kind === 'work' ? (
+                    <>
+                      <h2 className="panel-title">{view.title}</h2>
+                      <p className="panel-set">{view.setLabel ?? ' '}</p>
+                    </>
+                  ) : (
+                    <p className="panel-kicker">{view.title}</p>
+                  )}
+                  <p className="panel-sub">{view.sub ?? ' '}</p>
+                </div>
+                <ProgressRing ref={ring}>
+                  <p className="panel-big" aria-label={`${view.big} ${view.bigSuffix ?? ''}`}>
+                    <span className="panel-big-value">{view.big}</span>
+                    {view.bigSuffix && <span className="panel-big-suffix">{view.bigSuffix}</span>}
+                  </p>
+                </ProgressRing>
               </div>
 
               <div className="controls">

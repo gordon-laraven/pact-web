@@ -21,3 +21,12 @@ describe('Upload a video screen', () => {
     for (const r of reports) expect(r).toMatch(/onDownloadDebug=/)
   })
 })
+
+describe('review order', () => {
+  it('lists moves detected with low confidence first, each keeping its number in the video', async () => {
+    const { checkFirst } = await import('./VideoBuilder')
+    const item = (key: string, low: boolean) => ({ key, checkFirst: low }) as Parameters<typeof checkFirst>[0][number]
+    const order = checkFirst([item('a', false), item('b', true), item('c', false), item('d', true)])
+    expect(order.map(({ it, i }) => `${it.key}${i + 1}`)).toEqual(['b2', 'd4', 'a1', 'c3'])
+  })
+})

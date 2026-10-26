@@ -4,6 +4,7 @@ import { mirrorAnimation } from '../animation/mirror'
 import { buildTimeline } from '../engine/timeline'
 import { ExtractError, type Landmark, type TrackedClip } from '../extract/extract'
 import { OVERLAY_BONES, trackVideo } from '../extract/mediapipe'
+import { mergeMovements, splitMovement } from '../extract/edits'
 import { extractMovements, extractRange, type DebugLog, type Movement } from '../extract/segment'
 import { formatClock, prescription } from '../player/format'
 import type { Exercise, Workout } from '../types'
@@ -34,7 +35,7 @@ type Status =
 type Analysis = {
   clip: TrackedClip
   log: DebugLog
-  source: { name: string; duration: number; range: { start: number; end: number }; fromDebugFile?: boolean }
+  source: { name: string; duration: number; range: { start: number; end: number }; fromDebugFile?: boolean; slow?: boolean }
 }
 
 type Side = NonNullable<Exercise['side']>
@@ -51,7 +52,7 @@ type Form = {
 }
 
 /** One card in step 2: a detected (or hand-added) movement, or a generated other side. */
-type Item = {
+export type Item = {
   key: string
   movement: Movement
   form: Form
@@ -61,10 +62,15 @@ type Item = {
   /** Show the stick figure (and the video, when watching) flipped. */
   mirror: boolean
   addedByHand?: boolean
+  /** Low confidence when detected: listed first for checking. Fixed at detection so cards don't jump while you edit. */
+  checkFirst?: boolean
   rangeError?: string
 }
 
 const SAMPLE_FPS = 15
+/** "Slow analysis": twice the frames, and more analysis speeds for fast videos. Same device, no API cost. */
+const SLOW_FPS = 30
+const SLOW_STRETCHES = [1, 1.5, 2, 3]
 
 /** Starting values for a movement's form, from what was detected in the video. */
 function formFor(m: Movement, n: number): Form {
@@ -112,6 +118,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [items, setItems] = useState<Item[]>([])
   const [manual, setManual] = useState({ start: 0, end: 0, error: '' })
+  const [slow, setSlow] = useState(false)
 
   // Release the video and stop any analysis when leaving the screen.
   useEffect(() => () => abort.current?.abort(), [])
@@ -176,7 +183,11 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
     setAnalysis({ clip, log, source })
     setManual({ start: round1(source.range.start), end: round1(source.range.end), error: '' })
     try {
-      const movements = extractMovements(clip, `video-${Date.now().toString(36)}`, { videoDuration: source.duration, log })
+      const movements = extractMovements(clip, `video-${Date.now().toString(36)}`, {
+        videoDuration: source.duration,
+        log,
+        stretches: source.slow ? SLOW_STRETCHES : undefined,
+      })
       movements.forEach((m) => registerAnimation(m.result.animation))
       const next: Item[] = []
       movements.forEach((m, i) => {
@@ -185,11 +196,11 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
         const prev = next[next.length - 1]
         if (m.bothSidesShown && prev?.movement.bothSidesShown && prev.side === 'left') {
           form.name = sideNames(prev.form.name.replace(/ \(Left\)$/, '')).copy
-          next.push({ key: m.result.animation.id, movement: m, form, side: 'right', mirror: false })
+          next.push({ key: m.result.animation.id, movement: m, form, side: 'right', mirror: false, checkFirst: m.confidence === 'low' })
           return
         }
         if (m.bothSidesShown) form.name = `${form.name} (Left)`
-        next.push({ key: m.result.animation.id, movement: m, form, side: m.bothSidesShown ? 'left' : 'none', mirror: false })
+        next.push({ key: m.result.animation.id, movement: m, form, side: m.bothSidesShown ? 'left' : 'none', mirror: false, checkFirst: m.confidence === 'low' })
       })
       setItems(next)
       setStatus({ kind: 'done' })
@@ -200,7 +211,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
     }
   }
 
-  const analyze = async () => {
+  const analyze = async (slowly = slow) => {
     const v = video.current
     if (!v || !file) return
     abort.current?.abort()
@@ -213,14 +224,14 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
       const clip = await trackVideo(v, {
         start: range.start,
         end,
-        fps: SAMPLE_FPS,
+        fps: slowly ? SLOW_FPS : SAMPLE_FPS,
         signal: controller.signal,
         onFrame: drawOverlay,
         onProgress: (p) => setStatus({ kind: 'analyzing', progress: p }),
       })
       // Dev-only: lets you inspect raw tracking from the console (window.__pactClip).
       if (import.meta.env.DEV) (window as unknown as { __pactClip?: unknown }).__pactClip = clip
-      runExtraction(clip, { name: file.name, duration, range: { start: range.start, end } })
+      runExtraction(clip, { name: file.name, duration, range: { start: range.start, end }, slow: slowly })
     } catch (err) {
       if (controller.signal.aborted) return
       console.warn('[pact] pose tracking failed:', err)
@@ -292,7 +303,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
       app: 'pact-web',
       savedAt: new Date().toISOString(),
       video: source,
-      sampling: { framesPerSecond: SAMPLE_FPS, frameCount: clip.frames.length, timestamps: clip.frames.map((f) => f.t) },
+      sampling: { framesPerSecond: source.slow ? SLOW_FPS : SAMPLE_FPS, frameCount: clip.frames.length, timestamps: clip.frames.map((f) => f.t) },
       pieces: log.pieces,
       decisions: log.decisions,
       movements: movementSummary(),
@@ -318,7 +329,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
       setFile(null)
       const start = clip.frames[0]?.t ?? 0
       const end = clip.frames[clip.frames.length - 1]?.t ?? 0
-      runExtraction(clip, { name: data.video?.name ?? f.name, duration: data.video?.duration ?? end, range: { start, end }, fromDebugFile: true })
+      runExtraction(clip, { name: data.video?.name ?? f.name, duration: data.video?.duration ?? end, range: { start, end }, fromDebugFile: true, slow: !!data.video?.slow })
     } catch (err) {
       setStatus({ kind: 'error', message: "That file isn't a pact debug file.", step: 'Loading a debug file', cause: err })
     }
@@ -357,6 +368,66 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
       const copy: Item = { ...it, key: `${key}-other`, side: names.copySide, copyOf: key, mirror: false, form: { ...it.form, name: names.copy } }
       return [...all.slice(0, i), original, copy, ...all.slice(i + 1)]
     })
+
+  /** The next movement in the video (not counting generated other sides). */
+  const nextOf = (key: string) => {
+    const order = items.filter((x) => !x.copyOf)
+    const i = order.findIndex((x) => x.key === key)
+    return i >= 0 ? order[i + 1] : undefined
+  }
+
+  /** Two neighbouring cards that are really one movement: re-read them as one range. */
+  const mergeWithNext = (key: string) => {
+    const a = items.find((x) => x.key === key)
+    const b = nextOf(key)
+    if (!analysis || !a || !b) return
+    const m = mergeMovements(analysis.clip, a.movement, b.movement, `${key}-m${Date.now().toString(36)}`)
+    if (!m) {
+      update(key, { rangeError: "Couldn't follow one movement across both. Try adjusting the ranges instead." })
+      return
+    }
+    registerAnimation(m.result.animation)
+    setItems((all) =>
+      all
+        .filter((x) => x.key !== b.key && x.copyOf !== b.key)
+        .map((x) =>
+          x.key === key || x.copyOf === key
+            ? { ...x, movement: m, rangeError: undefined, form: { ...x.form, tempoSec: clamp(m.result.secPerRep, 0.5, 10) } }
+            : x,
+        ),
+    )
+  }
+
+  /** One card that holds two movements: cut it in two at a time you choose. */
+  const splitAt = (key: string, at: number) => {
+    const it = items.find((x) => x.key === key)
+    if (!analysis || !it) return
+    const stamp = Date.now().toString(36)
+    const parts = splitMovement(analysis.clip, it.movement, at, [`${key}-a${stamp}`, `${key}-b${stamp}`])
+    if (!parts) {
+      update(key, { rangeError: `Couldn't split there. Each part needs at least 1.5 s with the body in frame (this move runs ${round1(it.movement.start)}–${round1(it.movement.end)} s).` })
+      return
+    }
+    parts.forEach((m) => registerAnimation(m.result.animation))
+    const [m1, m2] = parts
+    setItems((all) => {
+      const i = all.findIndex((x) => x.key === key)
+      const first: Item = { ...all[i], movement: m1, rangeError: undefined, form: { ...all[i].form, tempoSec: clamp(m1.result.secPerRep, 0.5, 10) } }
+      const second: Item = {
+        key: m2.result.animation.id,
+        movement: m2,
+        form: { ...formFor(m2, 0), name: `${all[i].form.name} (part 2)` },
+        side: 'none',
+        mirror: false,
+        addedByHand: true,
+        checkFirst: all[i].checkFirst,
+      }
+      // A generated other side belonged to the whole; it's removed (add it again for either part).
+      const rest = all.filter((x, j) => j !== i && x.copyOf !== key)
+      rest.splice(i, 0, first, second)
+      return rest
+    })
+  }
 
   /** Re-analyse a movement for a range you set by hand. */
   const setRangeFor = (key: string, start: number, end: number) => {
@@ -541,9 +612,16 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
                 </button>
               </div>
             ) : (
-              <button type="button" className="secondary-button" onClick={analyze} disabled={!duration}>
-                {analysis ? 'Look again' : 'Find the moves'}
-              </button>
+              <>
+                <label className="check-label">
+                  <input type="checkbox" checked={slow} onChange={(e) => setSlow(e.target.checked)} />
+                  Slow analysis
+                </label>
+                <p className="step-hint">For fast videos, or when a move is missed: twice the frames and extra checks. Takes about twice as long.</p>
+                <button type="button" className="secondary-button" onClick={() => void analyze()} disabled={!duration}>
+                  {analysis ? 'Look again' : 'Find the moves'}
+                </button>
+              </>
             )}
           </>
         )}
@@ -568,11 +646,26 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
           {items.length > 0 && (
             <p className="step-hint">
               In the order they appear. Name each one, fix any range that's off, and delete anything that isn't an exercise.
-              {lowCount > 0 && ` ${lowCount} ${lowCount === 1 ? 'needs' : 'need'} a check.`}
+              {lowCount > 0 && ` ${lowCount} ${lowCount === 1 ? 'needs' : 'need'} a check, so ${lowCount === 1 ? "it's" : "they're"} shown first.`}
             </p>
           )}
+          {file && !analysis.source.slow && (lowCount > 0 || items.length === 0) && (
+            <div className="report-inline">
+              <p className="step-hint">Fast video, or a move missing? Slow analysis takes a closer look.</p>
+              <button
+                type="button"
+                className="text-btn report-open"
+                onClick={() => {
+                  setSlow(true)
+                  void analyze(true)
+                }}
+              >
+                Look again with slow analysis
+              </button>
+            </div>
+          )}
           <ol className="movement-list">
-            {items.map((it, i) => (
+            {checkFirst(items).map(({ it, i }) => (
               <MovementCard
                 key={it.key}
                 index={i}
@@ -590,6 +683,8 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
                 onDownloadDebug={debugDownload}
                 onDelete={() => removeItem(it.key)}
                 onOtherSide={() => addOtherSide(it.key)}
+                onMergeNext={nextOf(it.key) ? () => mergeWithNext(it.key) : undefined}
+                onSplit={(at) => splitAt(it.key, at)}
                 onMirror={(mirror) => update(it.key, { mirror })}
               />
             ))}
@@ -710,7 +805,16 @@ type CardProps = {
   onDownloadDebug?: () => void
   onDelete: () => void
   onOtherSide: () => void
+  /** Present when there's a next movement to merge with. */
+  onMergeNext?: () => void
+  onSplit: (at: number) => void
   onMirror: (mirror: boolean) => void
+}
+
+/** Cards detected with low confidence first (to check), each keeping its number in the video's order. */
+export function checkFirst(items: Item[]): { it: Item; i: number }[] {
+  const low = (it: Item) => (it.checkFirst ? 0 : 1)
+  return items.map((it, i) => ({ it, i })).sort((a, b) => low(a.it) - low(b.it) || a.i - b.i)
 }
 
 const CONFIDENCE_LABEL = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' } as const
@@ -724,6 +828,8 @@ function MovementCard(p: CardProps) {
   const copy = !!it.copyOf
   const set = (patch: Partial<Form>) => p.onForm({ ...form, ...patch })
   const [edit, setEdit] = useState({ start: round1(m.start), end: round1(m.end) })
+  const [splitAtSec, setSplitAtSec] = useState(round1((m.start + m.end) / 2))
+  useEffect(() => setSplitAtSec(round1((m.start + m.end) / 2)), [m.start, m.end])
   useEffect(() => setEdit({ start: round1(m.start), end: round1(m.end) }), [m.start, m.end])
   const detected =
     m.kind === 'reps'
@@ -795,6 +901,13 @@ function MovementCard(p: CardProps) {
             >
               Update range
             </button>
+            <label>
+              <span>Split at (sec)</span>
+              <input type="number" step={0.1} value={splitAtSec} onChange={(e) => setSplitAtSec(num(e))} />
+            </label>
+            <button type="button" className="secondary-button" onClick={() => p.onSplit(splitAtSec)}>
+              Split into two here
+            </button>
           </div>
         )}
         {it.rangeError && (
@@ -857,6 +970,11 @@ function MovementCard(p: CardProps) {
             disabled={p.hasCopy}
           >
             {p.hasCopy ? 'Other side added' : 'Add other side (reverse)'}
+          </button>
+        )}
+        {!copy && p.onMergeNext && (
+          <button type="button" className="text-btn" onClick={p.onMergeNext}>
+            Merge with the next move
           </button>
         )}
         <button type="button" className="text-btn danger" onClick={p.onDelete}>

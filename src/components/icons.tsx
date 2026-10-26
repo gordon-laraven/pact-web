@@ -84,3 +84,17 @@ export const RestartIcon = (p: P) => (
     <path d="M4 4v4.5h4.5" />
   </Svg>
 )
+
+export const UploadIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M12 15V4M7.5 8.5 12 4l4.5 4.5" />
+    <path d="M4.5 14.5v3A2.5 2.5 0 007 20h10a2.5 2.5 0 002.5-2.5v-3" />
+  </Svg>
+)
+
+export const LinkIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1" />
+    <path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1" />
+  </Svg>
+)

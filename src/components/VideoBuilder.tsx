@@ -448,6 +448,9 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
   // Play a single movement on its own (with the usual get-ready countdown).
   const playOne = (ex: Exercise) => onStart(workout([ex], `my-workout-${ex.id}`, ex.name))
 
+  // Dev only, and only once there's tracking to save. Offered inside "Report a problem".
+  const debugDownload = import.meta.env.DEV && analysis ? downloadDebug : undefined
+
   const analyzing = status.kind === 'analyzing'
   const lowCount = items.filter((it) => it.movement.confidence === 'low').length
 
@@ -548,6 +551,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
           <>
             <p className="builder-error">{status.message}</p>
             <ReportProblem
+              onDownloadDebug={debugDownload}
               context={() => ticketContext(status.step, status.message, status.cause)}
               onTryAgain={() => (file && duration ? void analyze() : reset())}
             />
@@ -560,11 +564,6 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
         <section className="overview-card builder-step">
           <div className="step-head">
             <h2 className="step-title">2. Check the {items.length === 1 ? 'move' : `${items.length} moves`}</h2>
-            {import.meta.env.DEV && (
-              <button type="button" className="text-btn" onClick={downloadDebug}>
-                Download debug file (dev)
-              </button>
-            )}
           </div>
           {items.length > 0 && (
             <p className="step-hint">
@@ -588,6 +587,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
                   ticketContext(`Updating the range of move ${i + 1}`, `${it.rangeError ?? ''} (move ${round1(it.movement.start)}–${round1(it.movement.end)} s)`)
                 }
                 onDismissError={() => update(it.key, { rangeError: undefined })}
+                onDownloadDebug={debugDownload}
                 onDelete={() => removeItem(it.key)}
                 onOtherSide={() => addOtherSide(it.key)}
                 onMirror={(mirror) => update(it.key, { mirror })}
@@ -615,6 +615,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
               <>
                 <p className="builder-error">{manual.error}</p>
                 <ReportProblem
+                  onDownloadDebug={debugDownload}
                   compact
                   context={() => ticketContext('Adding a missed movement', `${manual.error} (range ${manual.start}–${manual.end} s)`)}
                   onTryAgain={() => setManual({ ...manual, error: '' })}
@@ -626,6 +627,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
           <div className="report-inline">
             <p className="step-hint">Something look off in these results?</p>
             <ReportProblem
+              onDownloadDebug={debugDownload}
               compact
               context={() => ticketContext('Checking the moves')}
               onTryAgain={() => (file && duration ? void analyze() : undefined)}
@@ -705,6 +707,7 @@ type CardProps = {
   onRange: (start: number, end: number) => void
   reportContext: () => TicketContext
   onDismissError: () => void
+  onDownloadDebug?: () => void
   onDelete: () => void
   onOtherSide: () => void
   onMirror: (mirror: boolean) => void
@@ -797,7 +800,7 @@ function MovementCard(p: CardProps) {
         {it.rangeError && (
           <div className="span-2 card-error">
             <p className="builder-error">{it.rangeError}</p>
-            <ReportProblem compact context={p.reportContext} onTryAgain={p.onDismissError} />
+            <ReportProblem compact context={p.reportContext} onTryAgain={p.onDismissError} onDownloadDebug={p.onDownloadDebug} />
           </div>
         )}
         <div className="span-2 segmented" role="radiogroup" aria-label="Exercise type">

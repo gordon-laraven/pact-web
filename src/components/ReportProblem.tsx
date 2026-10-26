@@ -12,6 +12,8 @@ type Props = {
   store?: TicketStore
   /** Shorter wording inside a movement card. */
   compact?: boolean
+  /** Dev only: "Download debug file (dev)" at the bottom of the form (and if saving fails). */
+  onDownloadDebug?: () => void
 }
 
 type View =
@@ -20,7 +22,7 @@ type View =
   | { kind: 'saved'; id: string }
   | { kind: 'failed'; details: string }
 
-export function ReportProblem({ context, onTryAgain, store = ticketStore, compact = false }: Props) {
+export function ReportProblem({ context, onTryAgain, store = ticketStore, compact = false, onDownloadDebug }: Props) {
   const [view, setView] = useState<View>({ kind: 'closed' })
   const [form, setForm] = useState<TicketForm>(EMPTY_FORM)
 
@@ -43,15 +45,31 @@ export function ReportProblem({ context, onTryAgain, store = ticketStore, compac
         </button>
       )
     case 'form':
-      return <ReportForm value={form} saving={view.saving} onChange={setForm} onSubmit={() => void send()} onCancel={() => setView({ kind: 'closed' })} />
+      return (
+        <ReportForm
+          value={form}
+          saving={view.saving}
+          onChange={setForm}
+          onSubmit={() => void send()}
+          onCancel={() => setView({ kind: 'closed' })}
+          onDownloadDebug={onDownloadDebug}
+        />
+      )
     case 'saved':
       return <ReportSaved id={view.id} onTryAgain={tryAgain} />
     case 'failed':
-      return <ReportFailed details={view.details} onTryAgain={tryAgain} />
+      return <ReportFailed details={view.details} onTryAgain={tryAgain} onDownloadDebug={onDownloadDebug} />
   }
 }
 
-export function ReportForm(p: { value: TicketForm; saving: boolean; onChange: (f: TicketForm) => void; onSubmit: () => void; onCancel: () => void }) {
+export function ReportForm(p: {
+  value: TicketForm
+  saving: boolean
+  onChange: (f: TicketForm) => void
+  onSubmit: () => void
+  onCancel: () => void
+  onDownloadDebug?: () => void
+}) {
   const f = p.value
   return (
     <form
@@ -88,6 +106,7 @@ export function ReportForm(p: { value: TicketForm; saving: boolean; onChange: (f
           Not now
         </button>
       </div>
+      <DebugDownload onClick={p.onDownloadDebug} />
     </form>
   )
 }
@@ -111,7 +130,7 @@ export function ReportSaved({ id, onTryAgain }: { id: string; onTryAgain: () => 
   )
 }
 
-export function ReportFailed({ details, onTryAgain }: { details: string; onTryAgain: () => void }) {
+export function ReportFailed({ details, onTryAgain, onDownloadDebug }: { details: string; onTryAgain: () => void; onDownloadDebug?: () => void }) {
   const [copied, setCopied] = useState(false)
   return (
     <div className="report" role="status">
@@ -129,7 +148,18 @@ export function ReportFailed({ details, onTryAgain }: { details: string; onTryAg
           Try again
         </button>
       </div>
+      <DebugDownload onClick={onDownloadDebug} />
     </div>
+  )
+}
+
+/** Dev only (the caller decides): same label and behavior as before, now part of the report. */
+function DebugDownload({ onClick }: { onClick?: () => void }) {
+  if (!onClick) return null
+  return (
+    <button type="button" className="text-btn report-open" onClick={onClick}>
+      Download debug file (dev)
+    </button>
   )
 }
 

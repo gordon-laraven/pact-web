@@ -45,3 +45,24 @@ describe('Report a problem', () => {
     expect(all).not.toMatch(/grind|crush|shred|punish|no pain/i)
   })
 })
+
+describe('Download debug file (dev) lives in the report', () => {
+  const form = (onDownloadDebug?: () => void) =>
+    renderToStaticMarkup(<ReportForm value={EMPTY_FORM} saving={false} onChange={noop} onSubmit={noop} onCancel={noop} onDownloadDebug={onDownloadDebug} />)
+
+  it('sits at the bottom of the form, below the fields, the checkbox and Send report', () => {
+    const html = form(noop)
+    const at = (text: string) => html.indexOf(text)
+    expect(at('Download debug file (dev)')).toBeGreaterThan(at('Include technical details'))
+    expect(at('Download debug file (dev)')).toBeGreaterThan(at('Send report'))
+    expect(at('Download debug file (dev)')).toBeLessThan(at('</form>'))
+  })
+
+  it('is still there if saving the ticket fails', () => {
+    expect(renderToStaticMarkup(<ReportFailed details="x" onTryAgain={noop} onDownloadDebug={noop} />)).toContain('Download debug file (dev)')
+  })
+
+  it("isn't shown when there's nothing to download (or outside dev)", () => {
+    expect(form()).not.toContain('Download debug file')
+  })
+})

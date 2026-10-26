@@ -1,68 +1,379 @@
-/* ---------- Set for all movements ---------- */
+/* ---------- Review: one workout card per detected movement ---------- */
 
-.uniform-bar {
+.step-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.movement-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px;
+  gap: var(--space-4);
+}
+
+.movement-card {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
   border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-l);
+  background: var(--bg);
+  box-shadow: var(--shadow-1);
+  animation: rise-in var(--dur) var(--ease) both;
+}
+
+/* Detected with low confidence: an accent edge, and the "Check this one" tag says why */
+.movement-card.is-low {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent), var(--shadow-1);
+}
+
+.movement-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.movement-index {
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunk);
+  font-family: var(--font-head);
+  font-size: var(--text-s);
+  font-weight: var(--weight-head);
+  font-variant-numeric: tabular-nums;
+}
+
+.movement-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  font-size: var(--text-s);
+  font-weight: var(--weight-strong);
+}
+
+/* Confidence: a dot that fills with certainty, and always the words */
+.confidence {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+}
+
+.confidence-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-muted);
+}
+
+.confidence-high {
+  color: var(--accent);
+}
+
+.confidence-high .confidence-dot {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.confidence-medium .confidence-dot {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--bg); /* a ring with a smaller dot inside */
+}
+
+/* Name first, then the plan as read-only chips */
+.movement-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.movement-name {
+  margin: 0;
+  font-size: var(--text-xl);
+  overflow-wrap: anywhere;
+}
+
+.plan-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-chips li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunk);
+  color: var(--text-muted);
+  font-size: var(--text-s);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-chips strong {
+  color: var(--text);
+  font-family: var(--font-head);
+  font-weight: var(--weight-head);
+}
+
+/* What was seen: the extracted rep, and the numbers behind it */
+.movement-insight {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@container (min-width: 520px) {
+  .movement-insight {
+    grid-template-columns: 220px 1fr;
+    align-items: center;
+  }
+}
+
+.preview-figure {
+  height: min(260px, 38dvh);
+  padding: var(--space-2);
   border-radius: var(--radius-m);
   background: var(--surface-sunk);
 }
 
-.uniform-head .option-title {
-  margin: 0 0 4px;
+.movement-detected {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
-.uniform-head .step-hint {
+.result-summary {
   margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-s);
+  line-height: var(--leading-body);
+}
+
+.reasons {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-s);
+  line-height: var(--leading-body);
+}
+
+/* Editing: grouped, labelled, quieter than the summary */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4) var(--space-3);
+  align-items: end;
+  padding-top: var(--space-4);
+  border-top: var(--hairline) solid var(--line);
+}
+
+@container (min-width: 520px) {
+  .form-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.span-2 {
+  grid-column: 1 / -1;
+}
+
+.group-label {
+  margin: var(--space-2) 0 calc(-1 * var(--space-2));
+  color: var(--text);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.06em;
+}
+
+.group-label:first-of-type {
+  margin-top: 0;
+}
+
+.range-edit {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.range-edit .secondary-button {
+  grid-column: 1 / -1;
+  min-height: 44px;
+  font-size: var(--text-s);
+}
+
+@container (min-width: 520px) {
+  .range-edit {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .range-edit .secondary-button {
+    grid-column: auto;
+  }
+}
+
+.card-error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding-top: var(--space-4);
+  border-top: var(--hairline) solid var(--line);
+}
+
+.card-actions .secondary-button {
+  width: auto;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-s);
+}
+
+.card-actions .text-btn.danger {
+  margin-left: auto;
+}
+
+.mirror-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-m);
+  background: var(--surface-sunk);
+}
+
+.mirror-row .step-hint {
+  font-size: var(--text-xs);
+}
+
+.manual-add {
+  border: var(--hairline) dashed var(--line-strong);
+  border-radius: var(--radius-l);
+  padding: var(--space-4);
+}
+
+.manual-add summary {
+  cursor: pointer;
+  font-weight: var(--weight-strong);
+  color: var(--accent);
+}
+
+.manual-add[open] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.report-inline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* ---------- Set for all movements: the control panel at the top ---------- */
+
+.uniform-bar {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-l);
+  background: var(--surface-sunk);
+  box-shadow: inset 0 2px 0 var(--glow);
+}
+
+.uniform-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
 .uniform-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: var(--space-3);
   align-items: end;
 }
 
-.uniform-fields label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 14px;
-  color: var(--text-muted);
+@container (min-width: 560px) {
+  .uniform-fields {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.uniform-fields input {
+  font-family: var(--font-head);
+  font-size: var(--text-l);
+  font-weight: var(--weight-head);
+}
+
+.uniform-fields input::placeholder {
+  font-family: var(--font-body);
+  font-size: var(--text-s);
+  font-weight: var(--weight-medium);
 }
 
 .uniform-ask {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  animation: rise-in var(--dur) var(--ease);
 }
 
-.uniform-ask .step-hint,
 .uniform-ask-title {
   margin: 0;
-}
-
-.uniform-ask-title {
-  font-weight: 600;
+  font-family: var(--font-head);
+  font-size: var(--text-l);
+  font-weight: var(--weight-head);
 }
 
 .uniform-ask .report-actions {
   flex-wrap: wrap;
 }
 
+.uniform-ask .primary-button,
 .uniform-ask .secondary-button {
   width: auto;
-  padding: 0 18px;
+  flex: 1 1 auto;
 }
 
 .uniform-done {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 10px;
+  gap: var(--space-1) var(--space-3);
   margin: 0;
-  font-size: 15px;
   color: var(--text);
+  font-size: var(--text-s);
+  animation: fade-in var(--dur) var(--ease);
 }

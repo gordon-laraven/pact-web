@@ -903,19 +903,47 @@ function MovementCard(p: CardProps) {
             {formatClock(m.start)}–{formatClock(m.end)}
           </span>
         )}
-        <span className={`confidence confidence-${m.confidence}`}>{CONFIDENCE_LABEL[m.confidence]}</span>
+        <span className={`confidence confidence-${m.confidence}`}>
+          <span className="confidence-dot" aria-hidden="true" />
+          {CONFIDENCE_LABEL[m.confidence]}
+        </span>
         {m.confidence === 'low' && <span className="tag tag-check">Check this one</span>}
         {it.custom && <span className="tag">Custom</span>}
         {it.addedByHand && <span className="tag">Added by you</span>}
         {copy && <span className="tag">Other side of {p.originalIndex + 1}</span>}
       </div>
 
-      <AnimationPreview key={animation.id} animation={animation} secPerLoop={form.type === 'rep_based' ? form.tempoSec : r.animation.defaultTempoSec} />
-      <p className="result-summary">
-        Detected: {detected} · {r.view} view
-        {m.oneSided && !copy && (m.bothSidesShown ? ' · one-sided, both sides are in the video' : ' · works one side')}
-      </p>
-      {m.reasons.length > 0 && <p className="reasons">Why: {m.reasons.join('; ')}.</p>}
+      <div className="movement-summary">
+        <h3 className="movement-name">{form.name.trim() || `Movement ${p.index + 1}`}</h3>
+        <ul className="plan-chips" aria-label="Plan">
+          <li>
+            <strong>{form.sets}</strong> {form.sets === 1 ? 'set' : 'sets'}
+          </li>
+          {form.type === 'rep_based' ? (
+            <li>
+              <strong>{form.reps}</strong> reps
+            </li>
+          ) : (
+            <li>
+              <strong>{form.holdSec}</strong> sec
+            </li>
+          )}
+          <li>
+            <strong>{form.restSec}</strong> s rest
+          </li>
+        </ul>
+      </div>
+
+      <div className="movement-insight">
+        <AnimationPreview key={animation.id} animation={animation} secPerLoop={form.type === 'rep_based' ? form.tempoSec : r.animation.defaultTempoSec} />
+        <div className="movement-detected">
+          <p className="result-summary">
+            Detected: {detected} · {r.view} view
+            {m.oneSided && !copy && (m.bothSidesShown ? ' · one-sided, both sides are in the video' : ' · works one side')}
+          </p>
+          {m.reasons.length > 0 && <p className="reasons">Why: {m.reasons.join('; ')}.</p>}
+        </div>
+      </div>
 
       {copy && (
         <div className="mirror-row">
@@ -932,39 +960,7 @@ function MovementCard(p: CardProps) {
           <span>Exercise name</span>
           <input type="text" value={form.name} onChange={(e) => set({ name: e.target.value })} />
         </label>
-        {!copy && (
-          <div className="span-2 range-edit">
-            <label>
-              <span>Starts at (sec)</span>
-              <input type="number" step={0.1} value={edit.start} onChange={(e) => setEdit({ ...edit, start: num(e) })} />
-            </label>
-            <label>
-              <span>Ends at (sec)</span>
-              <input type="number" step={0.1} value={edit.end} onChange={(e) => setEdit({ ...edit, end: num(e) })} />
-            </label>
-            <button
-              type="button"
-              className="secondary-button"
-              disabled={edit.start === round1(m.start) && edit.end === round1(m.end)}
-              onClick={() => p.onRange(edit.start, edit.end)}
-            >
-              Update range
-            </button>
-            <label>
-              <span>Split at (sec)</span>
-              <input type="number" step={0.1} value={splitAtSec} onChange={(e) => setSplitAtSec(num(e))} />
-            </label>
-            <button type="button" className="secondary-button" onClick={() => p.onSplit(splitAtSec)}>
-              Split into two here
-            </button>
-          </div>
-        )}
-        {it.rangeError && (
-          <div className="span-2 card-error">
-            <p className="builder-error">{it.rangeError}</p>
-            <ReportProblem compact context={p.reportContext} onTryAgain={p.onDismissError} onDownloadDebug={p.onDownloadDebug} />
-          </div>
-        )}
+        <p className="group-label span-2">Plan</p>
         <div className="span-2 segmented" role="radiogroup" aria-label="Exercise type">
           {(['rep_based', 'time_based'] as const).map((t) => (
             <button
@@ -1008,6 +1004,40 @@ function MovementCard(p: CardProps) {
           <span>Form cues / notes (optional)</span>
           <input type="text" value={form.notes} placeholder="e.g. chest up, knees out" onChange={(e) => set({ notes: e.target.value })} />
         </label>
+        {!copy && <p className="group-label span-2">In the video</p>}
+        {!copy && (
+          <div className="span-2 range-edit">
+            <label>
+              <span>Starts at (sec)</span>
+              <input type="number" step={0.1} value={edit.start} onChange={(e) => setEdit({ ...edit, start: num(e) })} />
+            </label>
+            <label>
+              <span>Ends at (sec)</span>
+              <input type="number" step={0.1} value={edit.end} onChange={(e) => setEdit({ ...edit, end: num(e) })} />
+            </label>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={edit.start === round1(m.start) && edit.end === round1(m.end)}
+              onClick={() => p.onRange(edit.start, edit.end)}
+            >
+              Update range
+            </button>
+            <label>
+              <span>Split at (sec)</span>
+              <input type="number" step={0.1} value={splitAtSec} onChange={(e) => setSplitAtSec(num(e))} />
+            </label>
+            <button type="button" className="secondary-button" onClick={() => p.onSplit(splitAtSec)}>
+              Split into two here
+            </button>
+          </div>
+        )}
+        {it.rangeError && (
+          <div className="span-2 card-error">
+            <p className="builder-error">{it.rangeError}</p>
+            <ReportProblem compact context={p.reportContext} onTryAgain={p.onDismissError} onDownloadDebug={p.onDownloadDebug} />
+          </div>
+        )}
       </div>
 
       <div className="card-actions">

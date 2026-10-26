@@ -1,41 +1,113 @@
+/* ---------- Upload a video: choose, follow the movement, build the workout ---------- */
 
 .builder {
-  max-width: 560px;
+  max-width: var(--page-max);
   margin: 0 auto;
-  padding: max(20px, env(safe-area-inset-top)) 20px max(32px, env(safe-area-inset-bottom));
+  padding: max(var(--space-5), env(safe-area-inset-top)) var(--space-5) max(var(--space-8), env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--space-5);
+  animation: rise-in var(--dur) var(--ease);
+}
+
+@media (min-width: 900px) {
+  .builder {
+    max-width: 760px;
+    padding-top: var(--space-8);
+  }
+}
+
+.builder-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
 }
 
 .builder-header .text-btn {
-  margin-left: -4px;
+  margin-left: calc(-1 * var(--space-1));
 }
 
 .builder-title {
-  margin: 8px 0 0;
-  font-size: 30px;
+  margin: var(--space-2) 0 0;
+  font-size: clamp(1.75rem, 6vw, 2.25rem);
 }
 
 .builder-note {
-  margin: 6px 0 0;
+  margin: 0;
   color: var(--text-muted);
-  font-size: 15px;
+  font-size: var(--text-m);
 }
 
 .builder-step {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding-bottom: 20px;
+  gap: var(--space-4);
 }
+
+/* ---------- Choose a video: a big tile until a video is picked ---------- */
+
+.file-btn {
+  flex-direction: column;
+  cursor: pointer;
+}
+
+.file-btn:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.file-btn.is-empty {
+  gap: var(--space-2);
+  min-height: 176px;
+  padding: var(--space-6);
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--radius-xl);
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.file-btn.is-empty:hover {
+  filter: none;
+  border-color: var(--accent);
+  box-shadow: var(--shadow-2);
+}
+
+.file-btn-title {
+  font-family: var(--font-head);
+  font-weight: var(--weight-head);
+}
+
+.file-btn.is-empty .file-btn-title {
+  color: var(--accent);
+  font-size: var(--text-xl);
+}
+
+.file-btn-hint {
+  color: var(--text-muted);
+  font-size: var(--text-s);
+  font-weight: var(--weight-medium);
+}
+
+.file-btn .upload-tile-icon {
+  background: var(--surface);
+}
+
+.debug-load {
+  align-self: flex-start;
+}
+
+/* ---------- The video ---------- */
 
 .video-wrap {
   position: relative;
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l);
   overflow: hidden;
-  background: var(--bg-deep);
+  background: var(--stage-deep);
   line-height: 0;
+  box-shadow: var(--shadow-2);
 }
 
 .video-wrap video {
@@ -56,9 +128,9 @@
 }
 
 .file-name {
-  margin: -6px 0 0;
+  margin: calc(-1 * var(--space-2)) 0 0;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--text-s);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -67,56 +139,145 @@
 .trim {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .trim .text-btn {
   align-self: flex-start;
-  font-size: 14px;
 }
+
+/* ---------- Following the movement: real stages, real percentage ---------- */
 
 .analyze-progress {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 8px 12px;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-l);
+  background: var(--bg);
   color: var(--text-muted);
-  font-size: 15px;
+  font-size: var(--text-s);
   font-variant-numeric: tabular-nums;
+}
+
+.analyze-steps {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analyze-steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-muted);
+}
+
+/* Not started: a hollow ring. Doing: the accent ring. Done: a filled dot. Words carry it too. */
+.analyze-steps li::before {
+  content: '';
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+}
+
+.analyze-steps li.is-active {
+  color: var(--text);
+  font-weight: var(--weight-strong);
+}
+
+.analyze-steps li.is-active::before {
+  border: 3px solid var(--accent);
+  animation: breathe 1.6s var(--ease) infinite;
+}
+
+.analyze-steps li.is-done::before {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0.45;
+  }
 }
 
 .analyze-progress .progress-seg {
   grid-column: 1 / -1;
-  height: 6px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
 }
 
 .analyze-progress .progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left center;
   transition: transform 0.15s linear;
+}
+
+/* Placeholders while the moves are being found */
+.skeleton-step {
+  gap: var(--space-3);
+}
+
+.skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-l);
+  background: var(--bg);
+}
+
+.skeleton {
+  border-radius: var(--radius-s);
+  background: var(--surface-sunk);
+  animation: breathe 1.8s var(--ease) infinite;
+}
+
+.skeleton-title {
+  width: 45%;
+  height: 26px;
+}
+
+.skeleton-line {
+  height: 14px;
+}
+
+.skeleton-line.short {
+  width: 35%;
+}
+
+.skeleton-block {
+  height: 140px;
+  border-radius: var(--radius-m);
+}
+
+/* ---------- Your workout ---------- */
+
+.workout-name input {
+  font-family: var(--font-head);
+  font-weight: var(--weight-head);
 }
 
 .builder .exercise-list li {
   align-items: center;
+  gap: var(--space-3);
 }
 
 .builder .exercise-rx {
   margin-left: auto;
-}
-
-.remove-btn {
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: var(--radius-s);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 24px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.remove-btn:hover {
-  background: var(--surface-sunk);
-  color: var(--text);
 }
 
 .exercise-main {
@@ -128,31 +289,39 @@
 
 .exercise-meta {
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--text-s);
   font-variant-numeric: tabular-nums;
 }
 
-.play-one-btn {
+.play-one-btn,
+.remove-btn {
   flex: none;
   width: 36px;
   height: 36px;
-  border: var(--hairline) solid var(--line-strong);
+  display: grid;
+  place-items: center;
   border-radius: 50%;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.play-one-btn {
+  border: var(--hairline) solid var(--line-strong);
   background: transparent;
   color: var(--accent);
-  font-size: 13px;
-  cursor: pointer;
+  font-size: var(--text-xs);
 }
 
-.play-one-btn:hover {
+.remove-btn {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-xl);
+  line-height: 1;
+}
+
+.play-one-btn:hover,
+.remove-btn:hover {
   background: var(--surface-sunk);
-}
-
-.builder .exercise-list li {
-  gap: 12px;
-}
-
-.debug-load {
-  align-self: flex-start;
-  font-size: 14px;
+  color: var(--text);
 }

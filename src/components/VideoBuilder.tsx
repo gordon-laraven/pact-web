@@ -11,6 +11,7 @@ import type { Exercise, Workout } from '../types'
 import { applyToAll, changesPlan, cleanUniform, forNewMovement, undoApply, type Uniform, type Undo } from '../review/uniform'
 import type { TicketContext } from '../support/tickets'
 import { AnimationPreview } from './AnimationPreview'
+import { UploadIcon } from './icons'
 import { ReportProblem } from './ReportProblem'
 import { UniformBar } from './UniformBar'
 
@@ -175,7 +176,9 @@ export function VideoBuilder({ draft, onChange, uniform, onUniform, onBack, onSt
     if (!c || !ctx) return
     ctx.clearRect(0, 0, c.width, c.height)
     if (!lm) return
-    const accent = getComputedStyle(c).getPropertyValue('--accent-tint').trim() || '#8fd6b0'
+    // The mode's glow (a token), bright enough to read over any video.
+    const style = getComputedStyle(c)
+    const accent = style.getPropertyValue('--glow').trim() || style.color
     ctx.strokeStyle = accent
     ctx.fillStyle = accent
     ctx.lineWidth = Math.max(4, c.width / 90)
@@ -578,8 +581,14 @@ export function VideoBuilder({ draft, onChange, uniform, onUniform, onBack, onSt
           One person, whole body in frame, side-on or facing the camera. A clip with several exercises is split into one
           entry per movement.
         </p>
-        <label className="file-btn">
-          {file ? 'Choose a different video' : 'Choose video'}
+        <label className={file ? 'file-btn' : 'file-btn is-empty'}>
+          {!file && (
+            <span className="upload-tile-icon" aria-hidden="true">
+              <UploadIcon size={26} />
+            </span>
+          )}
+          <span className="file-btn-title">{file ? 'Choose a different video' : 'Choose video'}</span>
+          {!file && <span className="file-btn-hint">From this device. It stays here.</span>}
           <input type="file" accept="video/*" onChange={pick} hidden />
         </label>
         {import.meta.env.DEV && (
@@ -640,6 +649,12 @@ export function VideoBuilder({ draft, onChange, uniform, onUniform, onBack, onSt
 
             {analyzing ? (
               <div className="analyze-progress" role="status">
+                {/* The real stages, in order. "Finding the moves" runs after tracking, so it shows as next until the results appear. */}
+                <ol className="analyze-steps">
+                  <li className={status.progress === 0 ? 'is-active' : 'is-done'}>Getting body tracking ready</li>
+                  <li className={status.progress === 0 ? '' : 'is-active'}>Following the movement</li>
+                  <li>Finding the moves</li>
+                </ol>
                 <div className="progress-seg">
                   <div className="progress-fill" style={{ transform: `scaleX(${status.progress})` }} />
                 </div>
@@ -674,6 +689,21 @@ export function VideoBuilder({ draft, onChange, uniform, onUniform, onBack, onSt
         )}
         {analysis?.source.fromDebugFile && <p className="step-hint">Loaded from a debug file: there's no video to watch.</p>}
       </section>
+
+      {analyzing && !analysis && (
+        <section className="overview-card builder-step skeleton-step" aria-hidden="true">
+          <div className="skeleton skeleton-title" />
+          <div className="skeleton-card">
+            <div className="skeleton skeleton-line short" />
+            <div className="skeleton skeleton-line" />
+            <div className="skeleton skeleton-block" />
+          </div>
+          <div className="skeleton-card">
+            <div className="skeleton skeleton-line short" />
+            <div className="skeleton skeleton-line" />
+          </div>
+        </section>
+      )}
 
       {analysis && (
         <section className="overview-card builder-step">

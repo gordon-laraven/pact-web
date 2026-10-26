@@ -1,0 +1,351 @@
+/* ---------- Player ---------- */
+
+.player {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-deep); /* the margins around the 9:16 stage on wide screens */
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.stage {
+  /* Full screen on phones; a centred 9:16 column on anything wider. */
+  width: min(100vw, calc(100dvh * 9 / 16));
+  height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  container-type: size;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+  position: relative;
+}
+
+.stage-done {
+  cursor: default;
+}
+
+.topbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: max(10px, env(safe-area-inset-top)) 10px 8px;
+}
+
+.topbar-right {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.icon-btn {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--surface-sunk);
+}
+
+.badge {
+  padding: 5px 12px;
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 46cqw;
+}
+
+a.badge:hover {
+  color: var(--text);
+}
+
+.progress {
+  display: flex;
+  gap: 4px;
+  padding: 0 16px;
+}
+
+.progress-seg {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  will-change: transform;
+}
+
+.figure-area {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 2cqh 4cqw 0;
+}
+
+.figure {
+  width: 100%;
+  height: 100%;
+  display: block;
+  transition: opacity 0.35s ease;
+}
+
+.figure-bone {
+  stroke: var(--figure);
+  stroke-linecap: round;
+}
+
+.figure-dot {
+  fill: var(--figure-joint);
+}
+
+.figure-head {
+  fill: var(--figure);
+}
+
+/* the floor is the glow line: like a strip along a baseboard */
+.figure-floor {
+  stroke: var(--glow);
+  stroke-linecap: round;
+}
+
+/* Side view: the far-side limbs sit behind and read as depth. */
+.figure[data-view='side'] .figure-far {
+  opacity: 0.38;
+}
+
+/* Prep / rest: a dimmed, slowed preview of the next move. */
+.figure[data-mode='preview'] {
+  opacity: 0.42;
+}
+
+.is-paused .figure {
+  opacity: 0.3;
+}
+
+.paused-chip {
+  position: absolute;
+  left: 50%;
+  top: 2cqh;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: max(16px, 2.3cqh);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.panel {
+  padding: 0 20px max(18px, env(safe-area-inset-bottom));
+  background: var(--bg);
+  position: relative;
+  text-align: center;
+}
+
+.panel-text {
+  padding-top: 2cqh;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: max(24px, 3.9cqh);
+  line-height: 1.15;
+}
+
+.panel-set,
+.panel-sub {
+  margin: 0.4cqh 0 0;
+  font-size: max(16px, 2.4cqh);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-kicker {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: max(24px, 3.9cqh);
+  font-weight: var(--weight-head);
+  color: var(--accent);
+  line-height: 1.15;
+}
+
+/* Second line under the kicker keeps the layout the same height as work. */
+.stage-prep .panel-kicker::after,
+.stage-rest .panel-kicker::after {
+  content: '\a0';
+  display: block;
+  font-size: max(16px, 2.4cqh);
+  margin-top: 0.4cqh;
+}
+
+.panel-sub {
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.panel-big {
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.25em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  padding: 0.6cqh 0 0.8cqh;
+}
+
+.panel-big-value {
+  font-family: var(--font-head);
+  font-size: max(84px, 15cqh);
+  font-weight: var(--weight-head);
+  letter-spacing: -0.03em;
+}
+
+.panel-big-suffix {
+  font-size: max(28px, 4.8cqh);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.stage-rest .panel-big-value,
+.stage-prep .panel-big-value {
+  color: var(--accent);
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: max(24px, 7cqw);
+  padding-top: 2.2cqh;
+}
+
+.ctrl {
+  width: max(56px, 7cqh);
+  height: max(56px, 7cqh);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.ctrl:hover {
+  background: var(--surface-sunk);
+}
+
+.ctrl-main {
+  width: max(72px, 9cqh);
+  height: max(72px, 9cqh);
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.ctrl-main:hover {
+  background: var(--accent);
+  filter: brightness(1.06);
+}
+
+/* ---------- Finish ---------- */
+
+.finish {
+  grid-row: 3 / 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3cqh;
+  padding: 0 24px 8cqh;
+  text-align: center;
+}
+
+.finish-title {
+  margin: 0;
+  font-size: max(34px, 5.4cqh);
+  line-height: 1.1;
+}
+
+.finish-note {
+  margin: -1.5cqh 0 0;
+  color: var(--text-muted);
+  font-size: max(16px, 2.4cqh);
+}
+
+.finish-time {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6cqh;
+}
+
+.finish-time-value {
+  font-family: var(--font-head);
+  font-size: max(72px, 12cqh);
+  font-weight: var(--weight-head);
+  line-height: 1;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.finish-time-label {
+  font-size: max(16px, 2.4cqh);
+  color: var(--text-muted);
+}
+
+.restart-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 0 28px;
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.restart-button:hover {
+  background: var(--surface-sunk);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .figure {
+    transition: none;
+  }
+}

@@ -20,15 +20,55 @@
   --burnt-honey: #a86a00; /* brand value; 3.88:1 on Bone. AA version: #8a5600 */
   --mulberry: #7a3b5e; /* PLACEHOLDER: true errors only. Never red. */
 
+  /* Warm Iron's darker and lighter steps (derived, for layered dark surfaces) */
+  --iron-deep: #2e2a27;
+  --iron-raised: #45403c;
+  --iron-line: #57504b;
+  --mushroom-text: #c2b4a6; /* AA: Mushroom lifted (Mushroom is 4.47:1 on --iron-raised) */
+
   /* ----- Type ----- */
   --font-head: 'Sora Variable', 'Sora', 'Inter Variable', system-ui, sans-serif;
   --font-body: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --weight-head: 600;
+  --weight-strong: 600;
+  --weight-medium: 500;
+
+  /* Type scale: Sora for headlines and workout numbers, Inter for everything else */
+  --text-xs: 0.8125rem; /* 13px: tags, captions */
+  --text-s: 0.875rem; /* 14px: labels, supporting text */
+  --text-m: 1rem; /* 16px: body */
+  --text-l: 1.125rem; /* 18px: buttons, list items */
+  --text-xl: 1.375rem; /* 22px: card titles */
+  --text-2xl: 1.75rem; /* 28px: screen titles */
+  --text-3xl: clamp(2.25rem, 8vw, 3.25rem); /* home headline */
+  --leading-tight: 1.15;
+  --leading-body: 1.55;
+  --tracking-head: -0.015em;
+  --measure: 38ch; /* comfortable line length for supporting text */
+
+  /* Spacing: a 4/8-point scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 56px;
+  --page-max: 600px;
+  --page-wide: 1040px;
+
+  /* Motion: short and quiet; off when people ask for less motion (styles.css) */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
 
   /* ----- Shape ----- */
   --radius-s: 8px;
   --radius-m: 12px;
   --radius-l: 16px;
+  --radius-xl: 24px;
   --radius-pill: 999px;
   --hairline: 1px;
 
@@ -48,6 +88,27 @@
   --error-bg: #f2e6ea;
   --figure: var(--warm-iron);
   --figure-joint: var(--accent);
+  --focus: var(--accent); /* keyboard focus ring */
+
+  /* Soft, layered elevation, tinted with the palette (never pure black) */
+  --shadow-tint: var(--warm-iron);
+  --shadow-1: 0 1px 2px color-mix(in srgb, var(--shadow-tint) 8%, transparent);
+  --shadow-2: 0 1px 2px color-mix(in srgb, var(--shadow-tint) 6%, transparent),
+    0 10px 28px -14px color-mix(in srgb, var(--shadow-tint) 28%, transparent);
+  --shadow-3: 0 2px 4px color-mix(in srgb, var(--shadow-tint) 6%, transparent),
+    0 24px 48px -20px color-mix(in srgb, var(--shadow-tint) 34%, transparent);
+
+  /* Workout player: a dark stage in both modes, lit by the mode's glow */
+  --stage-bg: var(--warm-iron);
+  --stage-deep: var(--iron-deep); /* around the 9:16 stage on wide screens */
+  --stage-surface: var(--iron-raised);
+  --stage-line: var(--iron-line);
+  --stage-text: var(--bone);
+  --stage-muted: var(--mushroom-text);
+  --stage-accent: var(--ice-cyan); /* 7.7:1 on Warm Iron: fine for numerals and text here */
+  --stage-on-accent: var(--warm-iron);
+  --stage-figure: var(--bone);
+  --stage-joint: var(--ice-cyan);
 
   color-scheme: light;
 }
@@ -55,13 +116,13 @@
 /* ----- Dark · Amber ----- */
 :root[data-theme='dark'] {
   --bg: var(--warm-iron);
-  --bg-deep: #2e2a27;
-  --surface: #45403c;
-  --surface-sunk: #2e2a27;
-  --line: #57504b;
+  --bg-deep: var(--iron-deep);
+  --surface: var(--iron-raised);
+  --surface-sunk: var(--iron-deep);
+  --line: var(--iron-line);
   --line-strong: #9a9087; /* Mortar lifted: Mortar is 2.68:1 on the dark card */
   --text: var(--bone);
-  --text-muted: #c2b4a6; /* AA: Mushroom lifted (Mushroom is 4.47:1 on the dark card) */
+  --text-muted: var(--mushroom-text);
   --accent: var(--honey-amber);
   --on-accent: var(--warm-iron);
   --glow: var(--honey-amber);
@@ -69,6 +130,9 @@
   --error-bg: #4a3c42;
   --figure: var(--bone);
   --figure-joint: var(--honey-amber);
+  --shadow-tint: var(--iron-deep);
+  --stage-accent: var(--honey-amber);
+  --stage-joint: var(--honey-amber);
 
   color-scheme: dark;
 }

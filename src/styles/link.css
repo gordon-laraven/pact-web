@@ -1,0 +1,113 @@
+/* ---------- Paste a link ---------- */
+
+.link-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin-top: -2px;
+}
+
+.link-row .step-hint {
+  margin: 0;
+}
+
+/* an indeterminate thin line while a step runs */
+.progress-seg.is-busy .progress-fill {
+  width: 30%;
+  transform: none;
+  animation: busy 1.4s ease-in-out infinite;
+}
+
+@keyframes busy {
+  from {
+    margin-left: -30%;
+  }
+  to {
+    margin-left: 100%;
+  }
+}
+
+.fallback-body {
+  margin-top: 6px;
+}
+
+.fallback-option {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: var(--hairline) solid var(--line);
+}
+
+.option-title {
+  margin: 0;
+  font-size: 17px;
+}
+
+.fallback-option .step-hint {
+  margin: 0;
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 14px;
+  border-left: 2px solid var(--glow);
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+  background: var(--surface-sunk);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.row-tools {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.movement-head .exercise-rx {
+  font-variant-numeric: tabular-nums;
+}
+
+.icon-chip {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.icon-chip:hover:not(:disabled) {
+  background: var(--surface-sunk);
+}
+
+.icon-chip:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-seg.is-busy .progress-fill {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
+.other-ways .overview-hint {
+  text-align: left;
+  margin-top: -4px;
+}

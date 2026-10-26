@@ -53,6 +53,19 @@ const PAIRS: [string, string, number][] = [
   ['line-strong', 'surface', 3],
   ['figure', 'bg', 3],
   ['figure-joint', 'bg', 3],
+  ['focus', 'bg', 3],
+  ['focus', 'surface', 3],
+  // The workout player's dark stage
+  ['stage-text', 'stage-bg', 4.5],
+  ['stage-text', 'stage-surface', 4.5],
+  ['stage-muted', 'stage-bg', 4.5],
+  ['stage-muted', 'stage-surface', 4.5],
+  ['stage-accent', 'stage-bg', 4.5],
+  ['stage-accent', 'stage-surface', 4.5],
+  ['stage-on-accent', 'stage-accent', 4.5],
+  ['stage-figure', 'stage-bg', 3],
+  ['stage-joint', 'stage-bg', 3],
+  ['stage-muted', 'stage-deep', 4.5],
 ]
 
 describe.each(Object.entries(themes))('%s theme', (_, vars) => {

@@ -6,6 +6,12 @@ import App from './App'
 import { exposeTicketsForReading } from './support/tickets'
 import './theme/tokens.css'
 import './styles.css'
+import './styles/home.css'
+import './styles/player.css'
+import './styles/builder.css'
+import './styles/link.css'
+import './styles/support.css'
+import './styles/review.css'
 
 exposeTicketsForReading() // pactTickets.list() in the console
 

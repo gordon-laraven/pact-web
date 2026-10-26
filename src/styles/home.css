@@ -1,0 +1,233 @@
+/* ---------- Overview ---------- */
+
+.overview {
+  min-height: 100dvh;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: max(40px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.overview-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.wordmark {
+  display: block;
+  color: var(--text);
+  flex: none;
+}
+
+.overview-hero {
+  padding: 8px 0 0;
+}
+
+.overview-hero h1 {
+  margin: 0;
+  font-size: clamp(34px, 9vw, 46px);
+  line-height: 1.1;
+}
+
+.tagline {
+  margin: 12px 0 0;
+  max-width: 34ch;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+/* the glow: one thin line, never a wash */
+.glow-line {
+  width: 56px;
+  height: 2px;
+  border: 0;
+  margin: 20px 0 0;
+  border-radius: 2px;
+  background: var(--glow);
+}
+
+.overview-card,
+.card {
+  background: var(--surface);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-l);
+  padding: 22px 20px 8px;
+}
+
+.overview-title {
+  margin: 0;
+  font-size: 24px;
+}
+
+.overview-meta {
+  margin: 6px 0 14px;
+  display: flex;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.exercise-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.exercise-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: var(--hairline) solid var(--line);
+  font-size: 17px;
+}
+
+.exercise-name {
+  font-weight: 500;
+}
+
+.exercise-rx {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.overview-actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.overview-actions .text-btn {
+  align-self: center;
+}
+
+.other-ways {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: var(--hairline) solid var(--line);
+}
+
+.other-ways h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.other-ways-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Primary: the glow color. One per screen. */
+.start-button,
+.primary-button {
+  width: 100%;
+  min-height: 56px;
+  border: 0;
+  border-radius: var(--radius-m);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.start-button,
+.primary-button.is-large {
+  min-height: 64px;
+  font-size: 20px;
+}
+
+.start-button:hover:not(:disabled),
+.primary-button:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.start-button:active,
+.primary-button:active {
+  transform: translateY(1px);
+}
+
+.primary-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.overview-hint {
+  margin: 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* Chips: small pills for options and labels */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.chip.is-static {
+  min-height: 28px;
+  padding: 0 12px;
+  border-color: var(--line);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: default;
+}
+
+.theme-toggle {
+  display: flex;
+  gap: 6px;
+}
+
+.theme-toggle .chip {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.theme-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.theme-dot-light {
+  background: var(--ice-cyan);
+  box-shadow: 0 0 0 1px var(--deep-cyan);
+}
+
+.theme-dot-dark {
+  background: var(--honey-amber);
+  box-shadow: 0 0 0 1px var(--burnt-honey);
+}

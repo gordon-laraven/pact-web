@@ -139,7 +139,9 @@ On the overview, press **Upload a video** (or pick it from the fallback after pa
 2. **Find the moves.** pact steps through the clip at 15 frames per second with [MediaPipe Pose](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker) and draws the tracked skeleton over the video.
    - It runs on your computer's graphics card, falling back to the processor.
    - The first run downloads the ~9 MB pose model from Google; after that it's cached.
-3. **Check the moves.** There's one card per movement, in video order. Each card has:
+   - **Slow analysis** (a checkbox above the button) is for fast videos, or when a move was missed. It tracks 30 frames per second instead of 15, and tries more analysis speeds (see below). It takes about twice as long and stays on your device, so there's no API cost. After a result with moves to check, a **Look again with slow analysis** link offers it.
+   - On every run, the tracker also analyses the moment halfway between two frames when it just lost the person (often motion blur) or when the hands, feet or hips moved fast. That adds roughly 10–30% time on fast videos and almost nothing on slow ones.
+3. **Check the moves.** There's one card per movement, numbered in video order. Cards detected with low confidence are listed first, so you check those before anything else. Each card has:
    - **▶ 0:13–0:22**, which plays that part of your video.
    - A **confidence** rating (high/medium/low). Low ones get a **Check this one** tag and say why.
    - A preview loop of the extracted rep, and what was detected: sets, reps per set, seconds per rep, and the view.
@@ -147,6 +149,8 @@ On the overview, press **Upload a video** (or pick it from the fallback after pa
    On each card you can:
    - Name the movement, adjust Reps/Timed, sets, reps and rest, and optionally add form cues.
    - Fix the **start / end** if they're off. **Update range** re-analyses just that range.
+   - **Split into two here** cuts a card that holds two exercises at the second you choose. Each part is re-analysed, and the second becomes "(part 2)".
+   - **Merge with the next move** joins two cards that are really one exercise, re-analysed as one range. If the merged card comes back low confidence, they were probably two different moves: split it again.
    - **Delete** anything that isn't an exercise.
    - **Add a movement that was missed**, from a range you enter.
    - Use **Add other side (reverse)**. It's highlighted on moves that work one side (lunges, single-leg or single-arm work, side planks) when the video doesn't already show both sides.
@@ -159,6 +163,10 @@ On the overview, press **Upload a video** (or pick it from the fallback after pa
 
 **How a video is split into movements** (`src/extract/segment.ts`, pure and unit-tested). It runs in two passes, and nothing is sent anywhere.
 
+*Fast videos:* the rules below are in seconds, tuned for videos at normal speed. A sped-up reel squeezes each exercise into fewer seconds, so two look-alike moves can blur into one. If the first result isn't clear (clarity below 0.85, or anything low confidence), the same tracking is analysed again as if slowed to half speed. Only the timestamps are stretched; the video isn't re-read or altered. The clearer result wins, and normal speed is kept unless the slowed one is clearly better. Clarity is the share of the video covered by movements, weighted by confidence. Slow analysis also tries ×1.5 and ×3. The debug file's notes say which speed was kept.
+
+*Frozen frames:* when the tracker repeats its last answer exactly (it does this when it loses the person in a blur), those frames count as "not tracked". Otherwise they'd look perfectly still and could become a hold that isn't there.
+
 *Pass 1, candidates:*
 - **Describe each moment:** each frame's posture is measured relative to the hips, in spine lengths.
   - Turning around doesn't count as a change.
@@ -169,7 +177,10 @@ On the overview, press **Upload a video** (or pick it from the fallback after pa
 - **Labelling the pieces:**
   - **Transition:** shorter than 2 s, like getting down to the floor. It's absorbed into the movement before it if it looks like that move, otherwise dropped.
   - **Rest:** still while standing, kneeling, sitting or lying on the mat. These are never holds.
-  - **Hold:** still in an exercise position for at least 5 s. It gets high confidence if held up on the arms (plank, side plank), low confidence otherwise.
+  - **Hold:** still in an exercise position for at least 5 s. It gets high confidence if held up on the arms (plank, side plank), low confidence otherwise. A hold has to pass all three checks:
+    - **Every body part is still,** not just the average, so arm pulses in a plank position count as a movement.
+    - **It's still in at least 80% of its seconds,** not just on average.
+    - **The body is tracked in at least 80% of the frames.**
   - Anything else is a **movement**.
 - **Rhythm decides close calls.** The splitter cuts eagerly, then rhythm decides which pieces to put back together. A stretch's rhythm score says how steadily it repeats.
   - **Look-alikes stay apart:** two neighbouring pieces that look alike but each have a steady rhythm of their own, and *lose* it when joined, are different exercises. This happens with combo moves that share the same legs and differ in the arms.
@@ -196,7 +207,7 @@ On the overview, press **Upload a video** (or pick it from the fallback after pa
 
 **Debug file (dev builds only).** After analysing, **Download debug file (dev)** saves everything behind the result:
 - the video's name and length, and the analysed range;
-- the sampling (15 frames per second) and every frame's timestamp;
+- the sampling (15 frames per second, or 30 with slow analysis) and every frame's timestamp;
 - each piece with its label and why;
 - every decision in plain words;
 - the final movement list;
@@ -215,6 +226,8 @@ In dev builds (`npm run dev`), **Load a debug file instead** re-runs the splitti
 - **Make one loop:** the consistent reps are combined (the median at each moment of the rep) into one rep, and the loop is closed.
 - **Holds:** a clip with no real repetition (plank, wall sit) becomes a hold, with a subtle breathing loop.
 - **Fit:** the result is scaled to the library's body proportions and placed in the 0..1 frame, feet on the floor line. The output is a plain `Animation`, registered at runtime.
+
+**Measuring detection: the test set.** `testset/` holds videos with the movements you know they contain (see `testset/README.md`). For each one, `npm run eval` reports missed movements, fragments, extra detections and false holds, compared with the previous run. Your videos and tracking stay local: the folder is git-ignored except its README and an example.
 
 **Known limits:**
 - Side views of arms are the weak spot. The tracker has to guess the hidden arm and can mislocate the visible one when it crosses the face or body. Check the preview, and if an arm looks wrong, try trimming to a cleaner section or a clip with better lighting.

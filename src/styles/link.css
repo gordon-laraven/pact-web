@@ -1,21 +1,16 @@
-/* ---------- Paste a link ---------- */
+/* ---------- Paste a link (off for now: see src/features.ts) ---------- */
 
 .link-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .link-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-height: 28px;
-  margin-top: -2px;
-}
-
-.link-row .step-hint {
-  margin: 0;
 }
 
 /* an indeterminate thin line while a step runs */
@@ -34,41 +29,29 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .progress-seg.is-busy .progress-fill {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
 .fallback-body {
-  margin-top: 6px;
+  margin-top: var(--space-2);
 }
 
 .fallback-option {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding-top: 16px;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
   border-top: var(--hairline) solid var(--line);
-}
-
-.option-title {
-  margin: 0;
-  font-size: 17px;
-}
-
-.fallback-option .step-hint {
-  margin: 0;
-}
-
-.notice {
-  margin: 0;
-  padding: 10px 14px;
-  border-left: 2px solid var(--glow);
-  border-radius: 0 var(--radius-s) var(--radius-s) 0;
-  background: var(--surface-sunk);
-  color: var(--text);
-  font-size: 15px;
-  line-height: 1.5;
 }
 
 .row-tools {
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
   margin-left: auto;
 }
 
@@ -85,7 +68,7 @@
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text);
-  font-size: 16px;
+  font-size: var(--text-m);
   line-height: 1;
   cursor: pointer;
 }
@@ -96,18 +79,5 @@
 
 .icon-chip:disabled {
   opacity: 0.35;
-  cursor: default;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .progress-seg.is-busy .progress-fill {
-    animation: none;
-    width: 100%;
-    opacity: 0.5;
-  }
-}
-
-.other-ways .overview-hint {
-  text-align: left;
-  margin-top: -4px;
+  cursor: not-allowed;
 }

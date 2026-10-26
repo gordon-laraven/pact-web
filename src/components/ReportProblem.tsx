@@ -115,6 +115,11 @@ export function ReportSaved({ id, onTryAgain }: { id: string; onTryAgain: () => 
   const [copied, setCopied] = useState(false)
   return (
     <div className="report" role="status">
+      <span className="report-mark" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12.5l4.5 4.5L19 7.5" />
+        </svg>
+      </span>
       <h3 className="option-title">Got it. Thanks for telling us.</h3>
       <p className="step-hint">If you get in touch about this, mention this ticket:</p>
       <p className="ticket-id">

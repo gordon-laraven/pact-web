@@ -816,7 +816,7 @@ export function VideoBuilder({ draft, onChange, uniform, onUniform, onBack, onSt
       <section className="overview-card builder-step">
         <h2 className="step-title">Your workout</h2>
         {draft.exercises.length === 0 ? (
-          <p className="step-hint">Nothing here yet. Add a clip or two, then press start. Small is fine.</p>
+          <p className="empty-state">Nothing here yet. Add a clip or two, then press start. Small is fine.</p>
         ) : (
           <>
             <label className="workout-name">

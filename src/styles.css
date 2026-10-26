@@ -509,3 +509,10 @@ input:disabled {
     scroll-behavior: auto !important;
   }
 }
+
+/* Checked only after someone has typed or left a field, so empty forms don't start red. */
+input:user-invalid,
+textarea:user-invalid {
+  border-color: var(--error);
+  box-shadow: 0 0 0 1px var(--error);
+}

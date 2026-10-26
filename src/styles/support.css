@@ -1,33 +1,48 @@
-/* ---------- Report a problem ---------- */
+/* ---------- Report a problem: calm, clear, never a dead end ---------- */
 
 .report {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px;
+  gap: var(--space-4);
+  padding: var(--space-5);
   border: var(--hairline) solid var(--line);
-  border-left: 2px solid var(--glow);
-  border-radius: 0 var(--radius-m) var(--radius-m) 0;
+  border-radius: var(--radius-l);
   background: var(--surface);
-}
-
-.report .step-hint {
-  margin: 0;
+  box-shadow: inset 0 2px 0 var(--glow), var(--shadow-2);
+  animation: rise-in var(--dur) var(--ease);
 }
 
 .report .option-title {
-  margin: 0 0 4px;
+  margin: 0 0 var(--space-1);
+}
+
+.report .check-label + .step-hint {
+  margin-top: calc(-1 * var(--space-3));
+  padding-left: calc(20px + var(--space-3));
+  font-size: var(--text-xs);
 }
 
 .report-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .report-actions .primary-button {
   width: auto;
-  padding: 0 22px;
+  min-height: 48px;
+  padding: 0 var(--space-6);
+  font-size: var(--text-m);
+}
+
+/* "Download debug file (dev)": part of the report, under a hairline */
+.report > .text-btn:last-child {
+  align-self: flex-start;
+  padding-top: var(--space-3);
+  border-top: var(--hairline) solid var(--line);
+  border-radius: 0;
+  width: 100%;
 }
 
 .report-open.text-btn {
@@ -35,27 +50,63 @@
   padding-left: 0;
 }
 
+.report-open.secondary-button {
+  align-self: flex-start;
+  width: auto;
+}
+
+/* Sent: a quiet mark and an ID that's easy to copy */
+.report-mark {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  color: var(--accent);
+}
+
 .ticket-id {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: var(--hairline) dashed var(--line-strong);
+  border-radius: var(--radius-m);
+  background: var(--bg);
 }
 
 .ticket-id code {
+  flex: 1;
+  white-space: nowrap;
   font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
-  font-size: 18px;
-  letter-spacing: 0.04em;
+  font-size: var(--text-l);
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.06em;
   color: var(--text);
 }
 
-.card-error,
+.report textarea[readonly] {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: var(--text-xs);
+  background: var(--bg);
+}
+
 .report-inline {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-1);
 }
 
-.report-inline .step-hint {
+/* An empty list: a calm placeholder, not a blank */
+.empty-state {
   margin: 0;
+  padding: var(--space-5);
+  border: var(--hairline) dashed var(--line-strong);
+  border-radius: var(--radius-l);
+  color: var(--text-muted);
+  font-size: var(--text-s);
+  text-align: center;
 }

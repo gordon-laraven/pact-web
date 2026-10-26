@@ -1,8 +1,15 @@
-/* pact. Colors, fonts and radii come from theme/tokens.css (the one place to edit them). */
+/*
+  pact. The foundation: page base, type, and the shared components every
+  screen uses (buttons, inputs, chips, cards, tags, notices). Screen layouts
+  live in styles/*.css. Every color, size, shadow and timing comes from
+  theme/tokens.css.
+*/
 
 :root {
   font-family: var(--font-body);
+  line-height: var(--leading-body);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -33,10 +40,472 @@ h2,
 h3 {
   font-family: var(--font-head);
   font-weight: var(--weight-head);
-  letter-spacing: -0.01em;
+  letter-spacing: var(--tracking-head);
+  line-height: var(--leading-tight);
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus);
   outline-offset: 3px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- Things arrive quietly ---------- */
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---------- Buttons ---------- */
+
+/* Primary: the mode's accent. One per screen. */
+.start-button,
+.primary-button,
+.file-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 52px;
+  padding: 0 var(--space-6);
+  border: 0;
+  border-radius: var(--radius-m);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--text-l);
+  font-weight: var(--weight-strong);
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease),
+    filter var(--dur-fast) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+.start-button,
+.primary-button.is-large {
+  min-height: 60px;
+  font-size: var(--text-xl);
+}
+
+.start-button:hover:not(:disabled),
+.primary-button:hover:not(:disabled),
+.file-btn:hover {
+  filter: brightness(1.06);
+  box-shadow: var(--shadow-2);
+}
+
+.start-button:active:not(:disabled),
+.primary-button:active:not(:disabled),
+.file-btn:active {
+  transform: scale(0.985);
+}
+
+.start-button:disabled,
+.primary-button:disabled {
+  opacity: 0.45;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Secondary: a quiet neutral outline */
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--space-5);
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-m);
+  font-weight: var(--weight-strong);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: var(--surface-sunk);
+  border-color: var(--text-muted);
+}
+
+.secondary-button:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.secondary-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Suggested: an accent outline (e.g. "Add other side" on one-sided moves) */
+.secondary-button.is-suggested {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* Text buttons: links that act */
+.text-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 36px;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--accent);
+  font-size: var(--text-s);
+  font-weight: var(--weight-strong);
+  text-align: left;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.text-btn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.text-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Deleting isn't an error: quiet, not red */
+.text-btn.danger {
+  color: var(--text-muted);
+}
+
+.text-btn.danger:hover {
+  color: var(--text);
+}
+
+/* ---------- Cards ---------- */
+
+.overview-card,
+.card {
+  background: var(--surface);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6) var(--space-5);
+  box-shadow: var(--shadow-2);
+}
+
+.step-title {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.option-title {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: var(--text-l);
+  font-weight: var(--weight-head);
+  letter-spacing: var(--tracking-head);
+  line-height: var(--leading-tight);
+}
+
+.step-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-s);
+  line-height: var(--leading-body);
+}
+
+/* ---------- Fields ---------- */
+
+.field,
+.form-grid label,
+.trim label,
+.range-edit label,
+.workout-name,
+.uniform-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--text-s);
+  font-weight: var(--weight-medium);
+}
+
+input[type='number'],
+input[type='text'],
+input[type='url'],
+input[type='email'],
+select,
+textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--space-3);
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius-m);
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--text-m);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+textarea {
+  padding: var(--space-3);
+  line-height: var(--leading-body);
+  resize: vertical;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+input:hover:not(:disabled),
+select:hover:not(:disabled),
+textarea:hover:not(:disabled) {
+  border-color: var(--text-muted);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 1px var(--focus);
+}
+
+input:disabled {
+  opacity: 0.55;
+}
+
+.check-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 40px;
+  color: var(--text);
+  font-size: var(--text-m);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+.check-label input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--accent);
+}
+
+/* ---------- Chips and tags ---------- */
+
+/* Chips: small pills for options */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-s);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.chip:hover:not(.is-static):not(.is-on) {
+  background: var(--surface-sunk);
+}
+
+.chip.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.chip.is-static {
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  border-color: var(--line);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  cursor: default;
+}
+
+/* Option chips for one choice (Reps / Timed) */
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.segmented button {
+  min-height: 40px;
+  padding: 0 var(--space-5);
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-s);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.segmented button:hover:not(.is-on) {
+  background: var(--surface-sunk);
+}
+
+.segmented button.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* Tags: read-only labels (Custom, Added by you, Check this one) */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 var(--space-2);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* "Check this one": a calm accent outline, not an alarm */
+.tag-check {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- Notices ---------- */
+
+/* True errors only: muted mulberry, never red */
+.builder-error {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--error);
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+  background: var(--error-bg);
+  color: var(--error);
+  font-size: var(--text-s);
+  line-height: var(--leading-body);
+  animation: fade-in var(--dur) var(--ease);
+}
+
+.notice {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: 2px solid var(--glow);
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+  background: var(--surface-sunk);
+  color: var(--text);
+  font-size: var(--text-s);
+  line-height: var(--leading-body);
+}
+
+/* ---------- Theme toggle: a two-way pill ---------- */
+
+.theme-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.theme-toggle .chip {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border-color: transparent;
+  font-size: var(--text-xs);
+}
+
+.theme-toggle .chip.is-on {
+  border-color: var(--line-strong);
+  box-shadow: none;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.theme-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.theme-dot-light {
+  background: var(--ice-cyan);
+  box-shadow: 0 0 0 1px var(--deep-cyan);
+}
+
+.theme-dot-dark {
+  background: var(--honey-amber);
+  box-shadow: 0 0 0 1px var(--burnt-honey);
+}
+
+/* ---------- Less motion when asked ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

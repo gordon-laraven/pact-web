@@ -11,13 +11,26 @@ dist-ssr
 npm-debug.log*
 pnpm-debug.log*
 
-# local env / editor
+# local env / secrets (keys stay out of git)
 *.local
 .env
+.env.*
+!.env.example
+
+# system files
 .DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# editors
 .vscode/*
 !.vscode/extensions.json
 .idea
+*.swp
+
+# Netlify CLI's local state
+.netlify
 
 # MediaPipe runtime, copied from node_modules by scripts/copy-mediapipe-wasm.mjs
 public/mediapipe

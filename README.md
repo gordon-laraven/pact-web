@@ -28,6 +28,10 @@ pnpm preview    # serve the production build
 
 (npm works too: `npm install`, `npm run dev`, and so on.)
 
+### Deploy (Netlify)
+
+It's a static site. `netlify.toml` holds the settings: build command `pnpm run build`, publish folder `dist`, Node 22. The build copies MediaPipe's WebAssembly files into `dist/mediapipe/wasm`; the upload feature needs them. Nothing else is needed: no environment variables or server. The paste-a-link API only exists under `npm run dev` / `npm run preview`, and that feature is off.
+
 ### Fast testing: `?speed=`
 
 In **dev builds only** (`pnpm dev`), append `?speed=N` to multiply the player clock, e.g. <http://localhost:5173/?speed=4> runs the 6:45 workout in about 1:41.

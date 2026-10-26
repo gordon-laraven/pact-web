@@ -7,12 +7,11 @@
     "postinstall": "node scripts/copy-mediapipe-wasm.mjs",
     "predev": "node scripts/copy-mediapipe-wasm.mjs",
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/copy-mediapipe-wasm.mjs && tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b",
-    "prebuild": "node scripts/copy-mediapipe-wasm.mjs",
     "eval": "vitest run --config vitest.eval.config.ts"
   },
   "dependencies": {

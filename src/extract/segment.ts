@@ -67,6 +67,13 @@ export type ExtractOptions = {
   videoDuration?: number
   /** Filled in with every decision, for the debug file. */
   log?: DebugLog
+  /**
+   * Analysis speeds to try. 2 = analyse as if the video ran at half speed, so
+   * the time-based rules fit fast videos (sped-up reels, quick reps). The
+   * clearest result wins; 1 is tried first and kept when it's already clear.
+   * Default [1, 2]. "Slow analysis" passes more.
+   */
+  stretches?: number[]
 }
 
 const GAP_SEC = 0.7 // nobody tracked for this long = a break (title card, cut away)
@@ -91,6 +98,11 @@ const UNCLEAR_MIN_SEC = 4 // moving with no rhythm for less than this = a transi
 const LEFTOVER_MAX_SEC = 5 // leftovers up to this long can be folded into the movement next to them
 const BOUNDARY_SEARCH_SEC = 2 // how far a boundary between two movements may move to fit their rhythms
 const EDGE_TRIM_SEC = 0.25 // ignore the very edges of a piece (half a transition)
+const STILL_REGION = 0.1 // any one body part moving more than this = not a hold (arm-only moves)
+const HOLD_STEADY_SHARE = 0.8 // ...and at least this share of each second must be still
+const HOLD_MIN_COVERAGE = 0.8 // ...with the body tracked in at least this share of the frames
+const CLEAR_ENOUGH = 0.85 // a first result this clear (and nothing low) isn't re-analysed slower
+const PREFER_GAIN = 0.05 // a slower analysis must be this much clearer to win
 
 type Frame = { t: number; joints: number[] | null; nose?: { x: number; y: number }; vis?: { lArm: number; rArm: number; lLeg: number; rLeg: number } }
 type Feature = { t: number; f: number[]; hip: { x: number; y: number }; spine: number }
@@ -193,7 +205,7 @@ function supported(feats: Feature[]): boolean {
 }
 
 /** Runs of tracked frames, broken at gaps and at camera cuts (the body jumps in the frame). */
-function runs(frames: Frame[]): { feats: Feature[]; gapBefore: number }[] {
+function runs(frames: Frame[], gapSec = GAP_SEC): { feats: Feature[]; gapBefore: number }[] {
   const out: { feats: Feature[]; gapBefore: number }[] = []
   let cur: Feature[] = []
   let gapBefore = 0
@@ -206,7 +218,7 @@ function runs(frames: Frame[]): { feats: Feature[]; gapBefore: number }[] {
       last &&
       Math.hypot(p.hip.x - last.hip.x, p.hip.y - last.hip.y) / last.spine > 0.8 &&
       Math.abs(Math.log(p.spine / last.spine)) > 0.15
-    if (last && (gap > GAP_SEC || cut)) {
+    if (last && (gap > gapSec || cut)) {
       out.push({ feats: cur, gapBefore })
       cur = []
       gapBefore = gap
@@ -258,29 +270,107 @@ function splitRun(run: Feature[]): Omit<Piece, 'gapBefore'>[] {
   return pieces
 }
 
-function classify(p: Piece): { kind: Kind; why: string } {
+// Feature groups per body part (indices into postureFeature's x/y pairs).
+const REGIONS: Record<string, number[]> = {
+  arms: [4, 5, 6, 7],
+  legs: [10, 11, 12, 13],
+  torso: [0, 1, 2, 3],
+}
+
+/** The most any one body part moves (2 × std, spine lengths). An arm-only move counts as moving. */
+function regionMotion(feats: Feature[]): { part: string; m: number } {
+  let best = { part: 'body', m: 0 }
+  for (const [part, joints] of Object.entries(REGIONS)) {
+    let sum = 0
+    for (const j of joints) {
+      for (const k of [2 * j, 2 * j + 1]) {
+        const xs = feats.map((x) => x.f[k])
+        const mu = xs.reduce((a, b) => a + b, 0) / xs.length
+        sum += 2 * Math.sqrt(xs.reduce((a, v) => a + (v - mu) ** 2, 0) / xs.length)
+      }
+    }
+    const m = sum / (joints.length * 2)
+    if (m > best.m) best = { part, m }
+  }
+  return best
+}
+
+/** Not moving: the body as a whole, and every part of it on its own. */
+const isStill = (feats: Feature[]) => motion(feats) < STILL && regionMotion(feats).m < STILL_REGION
+
+/** Share of the piece's 1 s stretches that are still: a hold is still the whole way, not on average. */
+function steadyShare(feats: Feature[]): number {
+  const t0 = feats[0].t
+  const t1 = feats[feats.length - 1].t
+  let total = 0
+  let still = 0
+  for (let a = t0; a + 1 <= t1 + 1e-6; a += 1) {
+    const w = feats.filter((x) => x.t >= a && x.t < a + 1)
+    if (w.length < 3) continue
+    total++
+    if (motion(w) < STILL * 1.5 && regionMotion(w).m < STILL_REGION) still++ // a little slack for 1 s of tracker noise
+  }
+  return total ? still / total : 0
+}
+
+function classify(p: Piece, fps: number): { kind: Kind; why: string } {
   const dur = p.end - p.start
   if (dur < MIN_MOVE_SEC) return { kind: 'transition', why: `shorter than ${MIN_MOVE_SEC} s` }
   const m = motion(p.feats)
   if (m >= STILL) return { kind: 'move', why: `moving (${m.toFixed(2)})` }
+  const part = regionMotion(p.feats)
+  if (part.m >= STILL_REGION) return { kind: 'move', why: `only the ${part.part} move (${part.m.toFixed(2)})` }
   const rest = restPosition(p.feats)
   if (rest) return { kind: 'rest', why: `still and ${rest}` }
   if (dur < HOLD_MIN_SEC) return { kind: 'transition', why: `still for only ${dur.toFixed(1)} s; a hold needs ${HOLD_MIN_SEC} s` }
+  // A hold must be visibly, steadily still, with the body tracked throughout.
+  const coverage = fps > 0 ? p.feats.length / (dur * fps + 1) : 1
+  if (coverage < HOLD_MIN_COVERAGE) return { kind: 'transition', why: `still, but the body was tracked in only ${Math.round(coverage * 100)}% of frames` }
+  const steady = steadyShare(p.feats)
+  if (steady < HOLD_STEADY_SHARE) return { kind: 'transition', why: `still on average, but steady for only ${Math.round(steady * 100)}% of the time` }
   return { kind: 'hold', why: supported(p.feats) ? 'still, held up on the arms' : 'still, in an unusual position' }
 }
 
+/**
+ * Frames where the tracker repeated its last answer exactly (it does this when
+ * it loses the person in a blur). They'd look perfectly still, which is how a
+ * hold that isn't there gets in, so they count as "not tracked".
+ */
+export function dropFrozenFrames(clip: TrackedClip): TrackedClip {
+  let prev: TrackedClip['frames'][number]['landmarks'] = null
+  let changed = false
+  const frames = clip.frames.map((f) => {
+    const lm = f.landmarks
+    const frozen = !!lm && !!prev && lm.length === prev.length && lm.every((p, i) => p.x === prev![i].x && p.y === prev![i].y)
+    prev = lm ?? prev
+    if (!frozen) return f
+    changed = true
+    return { t: f.t, landmarks: null }
+  })
+  return changed ? { ...clip, frames } : clip
+}
+
+/** Typical seconds between frames. */
+function frameRate(clip: TrackedClip): number {
+  const dts: number[] = []
+  for (let i = 1; i < clip.frames.length; i++) dts.push(clip.frames[i].t - clip.frames[i - 1].t)
+  const dt = dts.length ? median(dts) : 0
+  return dt > 0 ? 1 / dt : 0
+}
+
 /** Pass 1: the clip cut into labelled pieces. */
-function cutIntoPieces(clip: TrackedClip): { pieces: Labelled[]; feats: Feature[] } {
+function cutIntoPieces(clip: TrackedClip, gapSec = GAP_SEC): { pieces: Labelled[]; feats: Feature[] } {
   const aspect = clip.width > 0 && clip.height > 0 ? clip.width / clip.height : 1
   const frames: Frame[] = clip.frames.map((f) => {
     const s = landmarksToSample(f.landmarks, aspect)
     return { t: f.t, joints: s?.joints ?? null, nose: s?.nose, vis: s?.vis }
   })
-  const rs = runs(frames)
+  const rs = runs(frames, gapSec)
+  const fps = frameRate(clip)
   const pieces = rs.flatMap((r) =>
     splitRun(r.feats).map((p, i) => {
       const piece: Piece = { ...p, gapBefore: i === 0 ? r.gapBefore : 0 }
-      return { ...piece, ...classify(piece), desc: describe(p.feats) }
+      return { ...piece, ...classify(piece, fps), desc: describe(p.feats) }
     }),
   )
   return { pieces, feats: rs.flatMap((r) => r.feats) }
@@ -318,11 +408,98 @@ type Group = {
   fromGapCheck?: boolean
 }
 
-/** The movements in a tracked clip, in order. Throws ExtractError (with a user-facing message) if there are none. */
+/**
+ * The movements in a tracked clip, in order. Throws ExtractError (with a
+ * user-facing message) if there are none.
+ *
+ * The rules below are in seconds, tuned for videos at normal speed. A sped-up
+ * reel squeezes each exercise into too few seconds (two look-alike moves then
+ * blur into one), so if the first result isn't clear, the clip is analysed
+ * again "slowed down" (its timestamps stretched), and the clearest result
+ * wins. Only timestamps change: no video is re-read, and nothing is stored.
+ */
 export function extractMovements(clip: TrackedClip, idPrefix: string, opts: ExtractOptions = {}): Movement[] {
+  const source = dropFrozenFrames(clip)
+  const speeds = [...new Set(opts.stretches ?? [1, 2])].filter((k) => k >= 1)
+  let best: { k: number; movements: Movement[]; q: number; log: DebugLog } | null = null
+  const tried: string[] = []
+  for (const k of speeds) {
+    if (best && !shouldTrySlower(best)) break
+    const log: DebugLog = { pieces: [], decisions: [] }
+    let movements: Movement[]
+    try {
+      movements = extractAtSpeed(stretch(source, k), idPrefix, { videoDuration: opts.videoDuration && opts.videoDuration * k, log }, k).map((m) => unstretch(m, k))
+    } catch (e) {
+      if (!(e instanceof ExtractError)) throw e
+      tried.push(`×${k}: nothing found`)
+      continue
+    }
+    const q = clarity(movements, source)
+    tried.push(`×${k}: ${movements.length} movements, clarity ${q.toFixed(2)}`)
+    if (!best || isClearer({ k, q }, best)) best = { k, movements, q, log }
+  }
+  if (!best) {
+    throw new ExtractError(
+      "Couldn't find a clear exercise in this video. Try a clip where one person does the moves with the whole body in frame.",
+    )
+  }
+  if (opts.log) {
+    const k = best.k
+    opts.log.pieces.push(...best.log.pieces.map((p) => ({ ...p, start: p.start / k, end: p.end / k })))
+    opts.log.decisions.push(
+      `Analysis speeds tried: ${tried.join('; ')}. Kept ×${k}${k === 1 ? ' (normal speed)' : ` (as if slowed ${k}×; times in the notes below are at that speed, divide by ${k})`}.`,
+      ...best.log.decisions,
+    )
+  }
+  return best.movements
+}
+
+/** A normal-speed result that's already clear (and has nothing low) isn't analysed again. */
+export function shouldTrySlower(r: { k: number; q: number; movements: Pick<Movement, 'confidence'>[] }): boolean {
+  return !(r.k === 1 && r.q >= CLEAR_ENOUGH && r.movements.every((m) => m.confidence !== 'low'))
+}
+
+/** A slower analysis has to be clearly better to replace a faster one. */
+export function isClearer(a: { k: number; q: number }, b: { k: number; q: number }): boolean {
+  return a.q > b.q + (a.k > b.k ? PREFER_GAIN : 0)
+}
+
+/** How clear a result is: the share of the video covered by movements, weighted by confidence. */
+function clarity(movements: Movement[], clip: TrackedClip): number {
+  const span = clip.frames.length ? clip.frames[clip.frames.length - 1].t - clip.frames[0].t : 0
+  if (span <= 0) return 0
+  const w = { high: 1, medium: 0.6, low: 0.2 }
+  return movements.reduce((a, m) => a + w[m.confidence] * (m.end - m.start), 0) / span
+}
+
+const stretch = (clip: TrackedClip, k: number): TrackedClip =>
+  k === 1 ? clip : { ...clip, frames: clip.frames.map((f) => ({ ...f, t: f.t * k })) }
+
+/** Back to real time: positions, reps and tempo. */
+function unstretch(m: Movement, k: number): Movement {
+  if (k === 1) return m
+  const r = m.result
+  return {
+    ...m,
+    start: m.start / k,
+    end: m.end / k,
+    sets: m.sets.map((s) => ({ ...s, start: s.start / k, end: s.end / k })),
+    result: {
+      ...r,
+      secPerRep: r.kind === 'reps' ? r.secPerRep / k : r.secPerRep,
+      repTimes: r.repTimes.map(([a, b]) => [a / k, b / k] as [number, number]),
+      animation: r.kind === 'reps' ? { ...r.animation, defaultTempoSec: r.animation.defaultTempoSec / k } : r.animation,
+    },
+  }
+}
+
+/** One analysis at one speed (k = how much the timestamps were stretched). */
+function extractAtSpeed(clip: TrackedClip, idPrefix: string, opts: ExtractOptions, k: number): Movement[] {
   const log = opts.log
   const note = (msg: string) => log?.decisions.push(msg)
-  const { pieces, feats } = cutIntoPieces(clip)
+  // Tracking gaps are real time, not tempo: a 0.7 s blur is a 0.7 s blur at any speed.
+  const { pieces, feats } = cutIntoPieces(clip, GAP_SEC * k)
+  const newSetGap = NEW_SET_GAP_SEC * k
   for (const p of pieces) log?.pieces.push({ start: p.start, end: p.end, kind: p.kind, why: p.why, motion: motion(p.feats) })
 
   // Rhythm of a stretch: how clearly it repeats (0 = no rhythm). Two different
@@ -364,7 +541,7 @@ export function extractMovements(clip: TrackedClip, idPrefix: string, opts: Extr
   let paused = false // a rest or a break since the last movement piece
   for (const p of pieces) {
     const prev = groups[groups.length - 1]
-    const pause = paused || p.gapBefore >= NEW_SET_GAP_SEC
+    const pause = paused || p.gapBefore >= newSetGap
     const similar = prev && distance(prev.desc, p.desc) < SAME_MOVE_THRESHOLD
     const lastSet = prev?.sets[prev.sets.length - 1]
     if (p.kind === 'rest') {
@@ -514,7 +691,7 @@ export function extractMovements(clip: TrackedClip, idPrefix: string, opts: Extr
     const nextGroup = groups[gi + 1]
     const stillAt = (a: number, b: number) => {
       const w = feats.filter((x) => x.t >= a && x.t < b)
-      return w.length >= 5 && motion(w) < STILL
+      return w.length >= 5 && isStill(w)
     }
     const s0 = first.start
     const e0 = last.end
@@ -556,8 +733,7 @@ export function extractMovements(clip: TrackedClip, idPrefix: string, opts: Extr
       note(`${t(a)}–${t(b)}: uncovered, but nobody is in frame (intro, title card or cut away)`)
       continue
     }
-    const m = motion(w)
-    if (m < STILL) {
+    if (isStill(w)) {
       note(`${t(a)}–${t(b)}: uncovered, body is still (${restPosition(w) ?? 'not a clear hold'}): not a movement`)
       continue
     }
@@ -677,7 +853,8 @@ export function extractMovements(clip: TrackedClip, idPrefix: string, opts: Extr
  * One movement from a time range you chose (editing a range, or adding a
  * missed movement by hand). Null if the body can't be tracked there.
  */
-export function extractRange(clip: TrackedClip, start: number, end: number, id: string): Movement | null {
+export function extractRange(rawClip: TrackedClip, start: number, end: number, id: string): Movement | null {
+  const clip = dropFrozenFrames(rawClip)
   const result = tryExtract(clip, start, end, id)
   if (!result) return null
   const reps = result.kind === 'reps' ? result.repsFound : 0
@@ -691,7 +868,7 @@ export function extractRange(clip: TrackedClip, start: number, end: number, id: 
     })
     .filter((x): x is Feature => !!x)
   // Same rules as detected movements; a range you chose is still checked.
-  const group: Group = { sets: [{ start, end }], desc: [], kind: result.kind === 'hold' && motion(feats) < STILL ? 'hold' : 'move', feats }
+  const group: Group = { sets: [{ start, end }], desc: [], kind: result.kind === 'hold' && isStill(feats) ? 'hold' : 'move', feats }
   const { confidence, reasons } = rate(group, result, reps)
   return {
     start,

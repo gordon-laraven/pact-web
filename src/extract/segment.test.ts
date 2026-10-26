@@ -4,7 +4,7 @@ import { animations, getAnimation } from '../animation/library'
 import type { Pose } from '../types'
 import { JOINTS } from '../types'
 import { ExtractError } from './extract'
-import { extractMovements, extractRange, sidedness, type DebugLog, type Movement } from './segment'
+import { extractMovements, extractRange, isClearer, shouldTrySlower, sidedness, type DebugLog, type Movement } from './segment'
 import { calfRaisePose, emptyPart, irregularPhase, kneelPose, lungePose, sitPose, spliceClips, squatComboPose } from './testClips'
 
 const A = (id: string) => getAnimation(id)
@@ -283,5 +283,79 @@ describe('look-alike combo moves back to back (the plate-workout case)', () => {
   it('still keeps one long set of a single combo move together', () => {
     const out = extractMovements(spliceClips([combo('press', 3.2, 26)]), 'c')
     expect(shape(out)).toEqual(['side reps x1'])
+  })
+})
+
+describe('fast videos (sped-up reels)', () => {
+  // The real-footage case (two look-alike sumo squats at 2× speed merging into
+  // one) is in the local test set (npm run eval); synthetic poses are too clean
+  // to blur together. These tests pin down the mechanics.
+  const combo = (arms: 'front-raise' | 'press', tempo: number, seconds: number) => ({
+    anim: A('squat'),
+    seconds,
+    opts: { poseAt: (t: number) => squatComboPose(t / tempo, arms) },
+  })
+  const fast = () => spliceClips([combo('front-raise', 1.1, 5.5), combo('press', 1.6, 6.5)], 15)
+
+  it('a slowed-down analysis reports real-time positions, reps and tempo', () => {
+    const out = extractMovements(fast(), 'f', { stretches: [2] })
+    expect(out).toHaveLength(2)
+    expect(near(out[0].end, 5.5, 0.8) && near(out[1].start, 5.5, 0.8)).toBe(true)
+    expect(out[1].end).toBeLessThanOrEqual(12)
+    expect(Math.abs(out[0].result.secPerRep - 1.1) / 1.1).toBeLessThan(0.15)
+    expect(Math.abs(out[1].result.secPerRep - 1.6) / 1.6).toBeLessThan(0.15)
+    expect(out[1].result.animation.defaultTempoSec).toBeCloseTo(out[1].result.secPerRep, 5)
+    expect(out.flatMap((m) => m.result.repTimes).every(([a, b]) => a >= 0 && b <= 12.1)).toBe(true)
+  })
+
+  it('a clear normal-speed result is kept without a second analysis', () => {
+    const log: DebugLog = { pieces: [], decisions: [] }
+    extractMovements(spliceClips([{ anim: A('squat'), seconds: 20 }]), 'n', { log })
+    expect(log.decisions[0]).toMatch(/tried: ×1: 1 movements[^;]*\. Kept ×1/)
+  })
+
+  it('an unclear first result is analysed again slower, and only a clearly better one wins', () => {
+    const m = (c: Movement['confidence']) => ({ confidence: c })
+    expect(shouldTrySlower({ k: 1, q: 0.9, movements: [m('high'), m('medium')] })).toBe(false)
+    expect(shouldTrySlower({ k: 1, q: 0.64, movements: [m('high'), m('low')] })).toBe(true) // the 2× plate video
+    expect(shouldTrySlower({ k: 1, q: 0.95, movements: [m('high'), m('low')] })).toBe(true)
+    expect(isClearer({ k: 2, q: 0.88 }, { k: 1, q: 0.64 })).toBe(true)
+    expect(isClearer({ k: 2, q: 0.66 }, { k: 1, q: 0.64 })).toBe(false) // a tie stays at normal speed
+  })
+})
+
+describe('hold rules', () => {
+  const squats = { anim: A('squat'), seconds: 12 }
+
+  it('frozen tracker output (the same frame repeated) is not a hold', () => {
+    const clip = spliceClips([squats, { anim: A('plank'), seconds: 9 }])
+    // From 12 s on, the tracker keeps returning its last answer.
+    const frozenFrom = clip.frames.findIndex((f) => f.t >= 12 && f.landmarks)
+    const frozen = clip.frames[frozenFrom].landmarks
+    const stuck = { ...clip, frames: clip.frames.map((f, i) => (i >= frozenFrom ? { t: f.t, landmarks: frozen } : f)) }
+    const out = extractMovements(stuck, 'z')
+    expect(out.map((m) => m.kind)).toEqual(['reps'])
+  })
+
+  it('a real plank is still a hold', () => {
+    const out = extractMovements(spliceClips([squats, { anim: A('plank'), seconds: 12 }]), 'h')
+    expect(out.map((m) => m.kind)).toEqual(['reps', 'hold'])
+  })
+
+  it('arm-only pulses in a plank position are a movement, not a hold', () => {
+    // Body still, only the arms pulse (the old rules averaged them away and called it a hold).
+    const plank = samplePose(A('plank'), 0)
+    const pulse = (t: number) => {
+      const u = (1 - Math.cos((2 * Math.PI * t) / 0.8)) / 2
+      return Object.fromEntries(
+        JOINTS.map((j) => {
+          const k = j.includes('Wrist') ? 0.08 : j.includes('Elbow') ? 0.04 : 0
+          return [j, { x: plank[j].x + k * u, y: plank[j].y - k * u }]
+        }),
+      ) as Pose
+    }
+    const out = extractMovements(spliceClips([squats, { anim: A('plank'), seconds: 10, opts: { poseAt: pulse } }]), 'p')
+    expect(out.map((m) => m.kind)).toEqual(['reps', 'reps'])
+    expect(near(out[1].start, 12, 1) && near(out[1].end, 22, 1)).toBe(true)
   })
 })

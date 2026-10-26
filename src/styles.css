@@ -296,7 +296,7 @@ textarea {
 input::placeholder,
 textarea::placeholder {
   color: var(--text-muted);
-  opacity: 0.85;
+  opacity: 1;
 }
 
 input:hover:not(:disabled),

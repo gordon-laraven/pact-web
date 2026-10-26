@@ -8,8 +8,6 @@ export type Theme = 'light' | 'dark'
 
 export const THEME_KEY = 'pact-theme'
 
-/** Browser bar color per theme (matches --bg in tokens.css). */
-const THEME_COLOR: Record<Theme, string> = { light: '#f4efe6', dark: '#3a3532' }
 
 function stored(): Theme | null {
   try {
@@ -24,7 +22,9 @@ const system = (): Theme => (window.matchMedia?.('(prefers-color-scheme: dark)')
 
 export function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[theme])
+  // The browser bar takes the page background, read from the tokens.
+  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()
+  if (bg) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg)
 }
 
 export function useTheme(): [Theme, (t: Theme) => void] {

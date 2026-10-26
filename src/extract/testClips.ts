@@ -3,6 +3,7 @@ import { squat as SQUAT } from '../animation/library/squat'
 import { along, BODY, FLOOR, ik, lerp, sidePose, v, wave } from '../animation/rig'
 import type { Animation, Joint, Pose } from '../types'
 import { JOINTS } from '../types'
+import { getAnimation } from '../animation/library'
 import type { Landmark, TrackedClip } from './extract'
 
 // Test-only: fake tracker output for unit tests (never imported by the app).
@@ -54,6 +55,8 @@ export type ClipOpts = {
   misleadingDepth?: boolean
   /** Visibility the tracker gives the hidden (far) limbs. */
   farVisibility?: number
+  /** Times (seconds into this clip) where tracking loses the person, like motion blur in fast reps. */
+  lostAt?: (t: number) => boolean
   /** Swap the tracker's left/right labels every N seconds, like real identity switches. */
   switchLabelsEverySec?: number
   seed?: number
@@ -75,7 +78,7 @@ export function fakeClip(anim: Animation, o: ClipOpts = {}): TrackedClip {
   const frames: TrackedClip['frames'] = []
   for (let i = 0; i < seconds * fps; i++) {
     const t = i / fps
-    if (rand() < dropout) {
+    if (rand() < dropout || o.lostAt?.(t)) {
       frames.push({ t: startTime + t, landmarks: null })
       continue
     }
@@ -216,4 +219,42 @@ export function squatComboPose(t: number, arms: 'front-raise' | 'press'): Pose {
   const elbow = along(pose.lShoulder, deg, BODY.upperArm)
   const wrist = along(elbow, deg + (arms === 'press' ? -4 : 0), BODY.forearm)
   return { ...pose, lElbow: elbow, rElbow: elbow, lWrist: wrist, rWrist: wrist }
+}
+
+/**
+ * A fast reel: five moves back to back at about twice normal speed, tracked at
+ * 15 fps, with tracking lost for a moment now and then (motion blur). Returns
+ * the clip and where each move really is.
+ */
+export function fastReel(fps = 15, speed = 2) {
+  const A = (id: string) => getAnimation(id)
+  const blur = (every: number, len: number) => (t: number) => t % every > every - len
+  const moves = [
+    { name: 'Squat', anim: A('squat'), seconds: 12, opts: { secPerRep: 2.2 } },
+    { name: 'Jumping jacks', anim: A('jumping-jacks'), seconds: 10, opts: { secPerRep: 0.9, lostAt: blur(3.3, 0.9) } },
+    { name: 'Lunge', anim: A('squat'), seconds: 12, opts: { poseAt: (t: number) => lungePose(t / 2.4) } },
+    { name: 'Calf raises', anim: A('squat'), seconds: 10, opts: { poseAt: (t: number) => calfRaisePose(t / 1.0) } },
+    { name: 'Push-up', anim: A('push-up'), seconds: 12, opts: { secPerRep: 2, lostAt: blur(4.1, 0.8) } },
+  ]
+  const parts = moves.map((m) => {
+    const opts = m.opts as ClipOpts
+    const poseAt = opts.poseAt
+    return {
+      anim: m.anim,
+      seconds: m.seconds / speed,
+      opts: {
+        ...opts,
+        secPerRep: opts.secPerRep ? opts.secPerRep / speed : undefined,
+        poseAt: poseAt ? (t: number) => poseAt(t * speed) : undefined,
+        lostAt: opts.lostAt ? (t: number) => opts.lostAt!(t * speed) : undefined,
+      },
+    }
+  })
+  let t = 0
+  const truth = moves.map((m) => {
+    const span = { name: m.name, start: t, end: t + m.seconds / speed }
+    t = span.end
+    return span
+  })
+  return { clip: spliceClips(parts, fps), truth }
 }

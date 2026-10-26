@@ -1,0 +1,8 @@
+{
+  "video": "my-workout.mp4",
+  "movements": [
+    { "name": "Squat", "start": 5, "end": 12.5 },
+    { "name": "Reverse lunge", "start": 12.5, "end": 23 },
+    { "name": "Plank", "start": 24, "end": 54, "kind": "hold" }
+  ]
+}

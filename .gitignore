@@ -21,3 +21,10 @@ pnpm-debug.log*
 
 # MediaPipe runtime, copied from node_modules by scripts/copy-mediapipe-wasm.mjs
 public/mediapipe
+
+# Detection test set: your videos and tracking stay local
+testset/*
+!testset/README.md
+!testset/example/
+testset/example/*
+!testset/example/truth.json

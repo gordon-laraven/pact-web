@@ -3,11 +3,12 @@ import { loopSecFor } from './animation/library'
 import { LinkBuilder, type LinkDraft } from './components/LinkBuilder'
 import { Overview } from './components/Overview'
 import { Player } from './components/Player'
-import { VideoBuilder, type Draft } from './components/VideoBuilder'
+import { VideoBuilder, type Draft, type UniformState } from './components/VideoBuilder'
 import { sampleWorkout } from './data/sampleWorkout'
 import { buildTimeline } from './engine/timeline'
 import { CuePlayer } from './player/audio'
 import { readSpeed } from './player/format'
+import { loadUniform, saveUniform } from './review/session'
 import { ENABLE_LINK_IMPORT } from './features'
 import { useTheme } from './theme/theme'
 import type { Workout } from './types'
@@ -26,6 +27,12 @@ export default function App() {
   // So does the list read from a link.
   const [linkDraft, setLinkDraft] = useState<LinkDraft | null>(null)
   const [cameFrom, setCameFrom] = useState<Screen>('overview')
+  // "Set for all movements" values, remembered for this session (this tab).
+  const [uniform, setUniformState] = useState<UniformState>(loadUniform)
+  const setUniform = useCallback((u: UniformState) => {
+    setUniformState(u)
+    saveUniform(u)
+  }, [])
 
   const play = useCallback(
     (workout: Workout, from: Screen) => {
@@ -48,6 +55,8 @@ export default function App() {
       <VideoBuilder
         draft={draft}
         onChange={setDraft}
+        uniform={uniform}
+        onUniform={setUniform}
         onBack={() => setScreen('overview')}
         onStart={(w) => play(w, 'builder')}
       />

@@ -1344,3 +1344,72 @@ a.badge:hover {
   margin: 0;
 }
 
+
+/* ---------- Set for all movements ---------- */
+
+.uniform-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface-sunk);
+}
+
+.uniform-head .option-title {
+  margin: 0 0 4px;
+}
+
+.uniform-head .step-hint {
+  margin: 0;
+}
+
+.uniform-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: end;
+}
+
+.uniform-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.uniform-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.uniform-ask .step-hint,
+.uniform-ask-title {
+  margin: 0;
+}
+
+.uniform-ask-title {
+  font-weight: 600;
+}
+
+.uniform-ask .report-actions {
+  flex-wrap: wrap;
+}
+
+.uniform-ask .secondary-button {
+  width: auto;
+  padding: 0 18px;
+}
+
+.uniform-done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+  font-size: 15px;
+  color: var(--text);
+}

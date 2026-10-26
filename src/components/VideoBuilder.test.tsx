@@ -2,13 +2,14 @@
 import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_UNIFORM } from '../review/uniform'
 import { VideoBuilder } from './VideoBuilder'
 
 const noop = () => {}
 
 describe('Upload a video screen', () => {
   it('has no debug download at the top of the screen', () => {
-    const html = renderToStaticMarkup(<VideoBuilder draft={{ title: 'My workout', exercises: [] }} onChange={noop} onBack={noop} onStart={noop} />)
+    const html = renderToStaticMarkup(<VideoBuilder draft={{ title: 'My workout', exercises: [] }} onChange={noop} uniform={{ values: DEFAULT_UNIFORM, active: null }} onUniform={noop} onBack={noop} onStart={noop} />)
     expect(html).toContain('Choose a clip')
     expect(html).not.toContain('Download debug file')
   })

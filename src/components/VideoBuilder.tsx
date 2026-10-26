@@ -8,9 +8,11 @@ import { mergeMovements, splitMovement } from '../extract/edits'
 import { extractMovements, extractRange, type DebugLog, type Movement } from '../extract/segment'
 import { formatClock, prescription } from '../player/format'
 import type { Exercise, Workout } from '../types'
+import { applyToAll, changesPlan, cleanUniform, forNewMovement, undoApply, type Uniform, type Undo } from '../review/uniform'
 import type { TicketContext } from '../support/tickets'
 import { AnimationPreview } from './AnimationPreview'
 import { ReportProblem } from './ReportProblem'
+import { UniformBar } from './UniformBar'
 
 // "Make from video": pick a clip, track the body, split it into its movements,
 // extract one clean rep of each, and add them to a workout. Everything happens
@@ -18,9 +20,15 @@ import { ReportProblem } from './ReportProblem'
 
 export type Draft = { title: string; exercises: Exercise[] }
 
+/** "Set for all movements": the values in the bar, and the last ones applied (new movements start from those). */
+export type UniformState = { values: Uniform; active: Uniform | null }
+
 type Props = {
   draft: Draft
   onChange: (draft: Draft) => void
+  /** Kept by App, so the values are still there after visiting another screen. */
+  uniform: UniformState
+  onUniform: (u: UniformState) => void
   onBack: () => void
   onStart: (workout: Workout) => void
 }
@@ -62,6 +70,8 @@ export type Item = {
   /** Show the stick figure (and the video, when watching) flipped. */
   mirror: boolean
   addedByHand?: boolean
+  /** Sets, reps, time, rest or type changed by hand: kept when the uniform values are applied (unless replaced). */
+  custom?: boolean
   /** Low confidence when detected: listed first for checking. Fixed at detection so cards don't jump while you edit. */
   checkFirst?: boolean
   rangeError?: string
@@ -107,7 +117,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 const num = (e: ChangeEvent<HTMLInputElement>) => Number(e.target.value)
 const round1 = (x: number) => Math.round(x * 10) / 10
 
-export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
+export function VideoBuilder({ draft, onChange, uniform, onUniform, onBack, onStart }: Props) {
   const video = useRef<HTMLVideoElement>(null)
   const overlay = useRef<HTMLCanvasElement>(null)
   const abort = useRef<AbortController | null>(null)
@@ -119,6 +129,8 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
   const [items, setItems] = useState<Item[]>([])
   const [manual, setManual] = useState({ start: 0, end: 0, error: '' })
   const [slow, setSlow] = useState(false)
+  /** The last "Apply to all", while it can be undone. */
+  const [lastApply, setLastApply] = useState<{ undo: Undo<Item>; active: Uniform | null; message: string } | null>(null)
 
   // Release the video and stop any analysis when leaving the screen.
   useEffect(() => () => abort.current?.abort(), [])
@@ -191,7 +203,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
       movements.forEach((m) => registerAnimation(m.result.animation))
       const next: Item[] = []
       movements.forEach((m, i) => {
-        const form = formFor(m, draft.exercises.length + i + 1)
+        const form = forNewMovement(formFor(m, draft.exercises.length + i + 1), uniform.active)
         // Both sides already in the video, back to back: label them as a pair.
         const prev = next[next.length - 1]
         if (m.bothSidesShown && prev?.movement.bothSidesShown && prev.side === 'left') {
@@ -355,6 +367,31 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
 
   const update = (key: string, patch: Partial<Item>) => setItems((all) => all.map((it) => (it.key === key ? { ...it, ...patch } : it)))
 
+  /** A card's own settings changed. Changing its plan (not its name or notes) makes it custom. */
+  const setForm = (key: string, form: Form) => {
+    setItems((all) => all.map((it) => (it.key === key ? { ...it, form, custom: it.custom || changesPlan(it.form, form) } : it)))
+    setLastApply(null) // an undo now would also wipe this edit
+  }
+
+  /** "Apply to all" from the bar at the top of the list. */
+  const applyUniform = (replaceCustom: boolean) => {
+    const values = cleanUniform(uniform.values)
+    const r = applyToAll(items, values, { replaceCustom })
+    setItems(r.items)
+    const parts = [`Applied to ${r.applied} move${r.applied === 1 ? '' : 's'}.`]
+    if (r.keptCustom) parts.push(`${r.keptCustom} custom ${r.keptCustom === 1 ? 'one' : 'ones'} kept.`)
+    if (r.timedKeptTime) parts.push(`${r.timedKeptTime} timed ${r.timedKeptTime === 1 ? 'move keeps its' : 'moves keep their'} time.`)
+    setLastApply({ undo: r.undo, active: uniform.active, message: parts.join(' ') })
+    onUniform({ values, active: values })
+  }
+
+  const undoUniform = () => {
+    if (!lastApply) return
+    setItems((all) => undoApply(all, lastApply.undo))
+    onUniform({ ...uniform, active: lastApply.active })
+    setLastApply(null)
+  }
+
   /** Delete a card; deleting a movement also deletes its generated other side. */
   const removeItem = (key: string) => setItems((all) => all.filter((it) => it.key !== key && it.copyOf !== key))
 
@@ -416,7 +453,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
       const second: Item = {
         key: m2.result.animation.id,
         movement: m2,
-        form: { ...formFor(m2, 0), name: `${all[i].form.name} (part 2)` },
+        form: { ...forNewMovement(formFor(m2, 0), uniform.active), name: `${all[i].form.name} (part 2)` },
         side: 'none',
         mirror: false,
         addedByHand: true,
@@ -463,7 +500,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
     const item: Item = {
       key: m.result.animation.id,
       movement: m,
-      form: formFor(m, draft.exercises.length + items.length + 1),
+      form: forNewMovement(formFor(m, draft.exercises.length + items.length + 1), uniform.active),
       side: 'none',
       mirror: false,
       addedByHand: true,
@@ -664,6 +701,17 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
               </button>
             </div>
           )}
+          {items.length > 0 && (
+            <UniformBar
+              values={uniform.values}
+              onValues={(values) => onUniform({ ...uniform, values })}
+              count={items.length}
+              customCount={items.filter((it) => it.custom).length}
+              onApply={applyUniform}
+              done={lastApply?.message ?? null}
+              onUndo={undoUniform}
+            />
+          )}
           <ol className="movement-list">
             {checkFirst(items).map(({ it, i }) => (
               <MovementCard
@@ -673,7 +721,7 @@ export function VideoBuilder({ draft, onChange, onBack, onStart }: Props) {
                 originalIndex={it.copyOf ? items.findIndex((x) => x.key === it.copyOf) : -1}
                 hasCopy={items.some((x) => x.copyOf === it.key)}
                 canWatch={!!file}
-                onForm={(form) => update(it.key, { form })}
+                onForm={(form) => setForm(it.key, form)}
                 onWatch={() => watch(it)}
                 onRange={(s, e) => setRangeFor(it.key, s, e)}
                 reportContext={() =>
@@ -857,6 +905,7 @@ function MovementCard(p: CardProps) {
         )}
         <span className={`confidence confidence-${m.confidence}`}>{CONFIDENCE_LABEL[m.confidence]}</span>
         {m.confidence === 'low' && <span className="tag tag-check">Check this one</span>}
+        {it.custom && <span className="tag">Custom</span>}
         {it.addedByHand && <span className="tag">Added by you</span>}
         {copy && <span className="tag">Other side of {p.originalIndex + 1}</span>}
       </div>

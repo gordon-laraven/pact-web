@@ -48,6 +48,13 @@ export type TrackOptions = {
   onProgress?: (fraction: number) => void
   /** Called after each frame with the landmarks found (for drawing an overlay). */
   onFrame?: (landmarks: Landmark[] | null) => void
+  /**
+   * Extra frames where they matter: after a frame where the person was lost
+   * (often motion blur), or when the body moved fast between frames, the
+   * moment halfway between is analysed too. Costs ~10–30% more time on
+   * fast videos, nothing on slow ones. Default on.
+   */
+  extraFrames?: boolean
 }
 
 export async function trackVideo(video: HTMLVideoElement, o: TrackOptions): Promise<TrackedClip> {
@@ -57,19 +64,43 @@ export async function trackVideo(video: HTMLVideoElement, o: TrackOptions): Prom
   const count = Math.max(1, Math.floor((end - o.start) * fps) + 1)
   video.pause()
   const frames: TrackedClip['frames'] = []
-  for (let i = 0; i < count; i++) {
-    if (o.signal?.aborted) throw new DOMException('Analysis cancelled', 'AbortError')
-    const t = o.start + i / fps
+  const detect = async (t: number, step: number) => {
     await seek(video, t)
-    clockMs += 1000 / fps
-    const result = lm.detectForVideo(video, clockMs)
-    const found = result.landmarks[0]
+    clockMs += step // timestamps only ever go up, as VIDEO mode requires
+    const found = lm.detectForVideo(video, clockMs).landmarks[0]
     const landmarks = found ? found.map((p) => ({ x: p.x, y: p.y, z: p.z, visibility: p.visibility })) : null
     frames.push({ t, landmarks })
     o.onFrame?.(landmarks)
+  }
+  for (let i = 0; i < count; i++) {
+    if (o.signal?.aborted) throw new DOMException('Analysis cancelled', 'AbortError')
+    const t = o.start + i / fps
+    // Halfway frames go in before the next regular one, so video time keeps moving forward.
+    if (o.extraFrames !== false && i > 0 && needsExtraFrame(frames[frames.length - 2]?.landmarks ?? null, frames[frames.length - 1].landmarks)) {
+      await detect(t - 0.5 / fps, 500 / fps)
+    }
+    await detect(t, 1000 / fps)
     o.onProgress?.((i + 1) / count)
   }
   return { width: video.videoWidth, height: video.videoHeight, frames }
+}
+
+/** Torso-relative landmarks this fast between two frames get a frame in between. */
+const FAST = 0.35
+const HANDS_FEET_HIPS = [15, 16, 27, 28, 23, 24]
+
+/**
+ * Should the moment before the next frame be analysed too? Yes if the last
+ * frame just lost the person (a blur, often), or if hands, feet or hips moved more
+ * than about a third of the torso length since the frame before.
+ */
+export function needsExtraFrame(before: Landmark[] | null, last: Landmark[] | null): boolean {
+  if (!last) return !!before // just lost the person; not every frame of a title card
+  if (!before) return false
+  const torso = Math.hypot((last[11].x + last[12].x - last[23].x - last[24].x) / 2, (last[11].y + last[12].y - last[23].y - last[24].y) / 2)
+  if (!(torso > 1e-3)) return false
+  const moved = Math.max(...HANDS_FEET_HIPS.map((i) => Math.hypot(last[i].x - before[i].x, last[i].y - before[i].y)))
+  return moved / torso > FAST
 }
 
 function seek(video: HTMLVideoElement, t: number): Promise<void> {
